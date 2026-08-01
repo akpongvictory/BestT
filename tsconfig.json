@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true
+  },
+  "files": [],
+  "references": [
+    { "path": "./packages/types" },
+    { "path": "./packages/shared" },
+    { "path": "./packages/ai" },
+    { "path": "./packages/prompts" },
+    { "path": "./apps/server" },
+    { "path": "./apps/client" }
+  ]
+}
