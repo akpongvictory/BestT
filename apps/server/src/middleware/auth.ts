@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
+
+// =====================================================
+// Extend Express Request
+// =====================================================
 export interface AuthRequest extends Request {
   user?: {
     id: string;
@@ -8,30 +12,36 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authenticateToken = (
+
+// =====================================================
+// Authentication Middleware
+// =====================================================
+export const authenticate = (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    return res.status(401).json({
-      success: false,
-      message: 'Access denied. No token provided.',
-    });
-  }
-
-  const token = authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid authorization header.',
-    });
-  }
 
   try {
+
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authorization token is required.',
+      });
+    }
+
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid authorization format.',
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+
     const decoded = jwt.verify(
       token,
       process.env.JWT_SECRET as string
@@ -43,10 +53,14 @@ export const authenticateToken = (
     req.user = decoded;
 
     next();
-  } catch {
+
+  } catch (error) {
+
     return res.status(401).json({
       success: false,
       message: 'Invalid or expired token.',
     });
+
   }
+
 };
