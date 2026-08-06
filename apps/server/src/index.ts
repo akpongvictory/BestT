@@ -4,7 +4,8 @@ import dotenv from 'dotenv';
 
 import healthRouter from './routes/health';
 import authRouter from './routes/auth';
-
+import courseRouter from "./routes/courses";
+import documentRouter from "./routes/documents";
 // Load environment variables
 dotenv.config();
 
@@ -14,18 +15,21 @@ const PORT = Number(process.env.PORT) || 5000;
 // Middleware
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:5173",
+    ],
     credentials: true,
   })
 );
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/health', healthRouter);
 app.use('/api/auth', authRouter);
-
+app.use('/api/courses', courseRouter);
+app.use('/api/documents', documentRouter);
 // Root endpoint
 app.get('/', (_req, res) => {
   res.status(200).json({
@@ -36,6 +40,7 @@ app.get('/', (_req, res) => {
       root: '/',
       health: '/health',
       auth: '/api/auth',
+      courses: '/api/courses',
     },
   });
 });

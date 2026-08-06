@@ -1,5 +1,3 @@
-// Prisma schema for BestT
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,59 +7,243 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ===============================
+// USERS
+// ===============================
+
 model User {
-  id        String     @id @default(uuid())
-  name      String
-  email     String     @unique
-  password  String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  courses   Course[]
-  progress  Progress[]
+  id String @id @default(uuid())
+
+  name     String
+  email    String @unique
+  password String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  courses Course[]
+
+  documents Document[]
+
+  quizAttempts QuizAttempt[]
+
+  chatSessions ChatSession[]
+
+  progress Progress[]
 }
+
+// ===============================
+// COURSES
+// ===============================
 
 model Course {
-  id          String     @id @default(uuid())
-  title       String
+  id String @id @default(uuid())
+
+  title String
+
   description String?
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  documents   Document[]
-  quizzes     Quiz[]
+
+  userId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  documents Document[]
+
+  quizzes Quiz[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
 }
+
+// ===============================
+// DOCUMENTS
+// ===============================
 
 model Document {
-  id        String          @id @default(uuid())
-  filename  String
-  courseId  String
-  course    Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  createdAt DateTime        @default(now())
-  chunks    DocumentChunk[]
+  id String @id @default(uuid())
+
+  filename String
+
+  originalName String
+
+  fileUrl String
+
+  fileType String
+
+  fileSize Int?
+
+  processingStatus DocumentStatus @default(PENDING)
+
+  courseId String
+
+  userId String
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  chunks DocumentChunk[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
 }
+
+enum DocumentStatus {
+  PENDING
+
+  PROCESSING
+
+  COMPLETED
+
+  FAILED
+}
+
+// ===============================
+// DOCUMENT CHUNKS
+// ===============================
 
 model DocumentChunk {
-  id         String   @id @default(uuid())
-  content    String
-  embedding  String?  // Text representation or vector payload
-  documentId String
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-}
+  id String @id @default(uuid())
 
-model Quiz {
-  id        String   @id @default(uuid())
-  title     String
-  courseId  String
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  content String
+
+  embedding String?
+
+  chunkIndex Int
+
+  documentId String
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
 }
 
+// ===============================
+// AI TUTOR CHAT
+// ===============================
+
+model ChatSession {
+  id String @id @default(uuid())
+
+  title String?
+
+  userId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  messages ChatMessage[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+}
+
+model ChatMessage {
+  id String @id @default(uuid())
+
+  role ChatRole
+
+  content String
+
+  sessionId String
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+enum ChatRole {
+  USER
+
+  ASSISTANT
+}
+
+// ===============================
+// QUIZ
+// ===============================
+
+model Quiz {
+  id String @id @default(uuid())
+
+  title String
+
+  description String?
+
+  courseId String
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  questions Question[]
+
+  attempts QuizAttempt[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+}
+
+// ===============================
+// QUESTIONS
+// ===============================
+
+model Question {
+  id String @id @default(uuid())
+
+  question String
+
+  options Json
+
+  answer String
+
+  explanation String?
+
+  quizId String
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+// ===============================
+// QUIZ ATTEMPTS
+// ===============================
+
+model QuizAttempt {
+  id String @id @default(uuid())
+
+  score Int
+
+  totalQuestions Int
+
+  answers Json?
+
+  userId String
+
+  quizId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+// ===============================
+// PROGRESS TRACKING
+// ===============================
+
 model Progress {
-  id        String   @id @default(uuid())
-  score     Int
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
+
+  activity String
+
+  value Int @default(0)
+
+  userId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
 }
