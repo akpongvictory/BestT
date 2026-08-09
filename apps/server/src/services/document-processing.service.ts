@@ -10,6 +10,7 @@ const CHUNK_SIZE = 1500;
 function createChunks(text: string): string[] {
   const normalizedText = text
     .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
@@ -17,20 +18,58 @@ function createChunks(text: string): string[] {
     return [];
   }
 
+  const paragraphs = normalizedText
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
   const chunks: string[] = [];
+  let currentChunk = "";
 
-  for (
-    let start = 0;
-    start < normalizedText.length;
-    start += CHUNK_SIZE
-  ) {
-    const chunk = normalizedText
-      .slice(start, start + CHUNK_SIZE)
-      .trim();
-
-    if (chunk) {
-      chunks.push(chunk);
+  for (const paragraph of paragraphs) {
+    if (!currentChunk) {
+      currentChunk = paragraph;
+      continue;
     }
+
+    const combinedLength =
+      currentChunk.length + 2 + paragraph.length;
+
+    if (combinedLength <= CHUNK_SIZE) {
+      currentChunk = `${currentChunk}\n\n${paragraph}`;
+      continue;
+    }
+
+    chunks.push(currentChunk);
+
+    if (paragraph.length <= CHUNK_SIZE) {
+      currentChunk = paragraph;
+      continue;
+    }
+
+    for (
+      let start = 0;
+      start < paragraph.length;
+      start += CHUNK_SIZE
+    ) {
+      const piece = paragraph
+        .slice(start, start + CHUNK_SIZE)
+        .trim();
+
+      if (!piece) {
+        continue;
+      }
+
+      if (piece.length === CHUNK_SIZE) {
+        chunks.push(piece);
+      } else {
+        currentChunk = piece;
+      }
+    }
+  }
+
+  if (currentChunk) {
+    chunks.push(currentChunk);
   }
 
   return chunks;
