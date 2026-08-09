@@ -24,7 +24,7 @@ function createChunks(text: string): string[] {
     .filter(Boolean);
 
   const chunks: string[] = [];
-  let currentChunk = "";
+  let currentChunk = ""; 
 
   for (const paragraph of paragraphs) {
     if (!currentChunk) {
