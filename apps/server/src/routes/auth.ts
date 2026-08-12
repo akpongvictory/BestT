@@ -5,10 +5,6 @@ import jwt from 'jsonwebtoken';
 
 import { authenticate, AuthRequest } from '../middleware/auth';
 import prisma from "../lib/prisma";
-import {
-  removeDocument,
-} from "../controllers/document.controller";
-const router = Router();
 
 
 // =====================================================
@@ -52,11 +48,6 @@ router.get('/', (_req, res) => {
   });
 });
 
-router.delete(
-  "/:id",
-  authenticate,
-  removeDocument
-);
 // =====================================================
 // POST /api/auth/register
 // Register a New User
