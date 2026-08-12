@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import prisma from "../lib/prisma";
 
-
+const router = Router();
 // =====================================================
 // Helper Function: Normalize Email
 // =====================================================
