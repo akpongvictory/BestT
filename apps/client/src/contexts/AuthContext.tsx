@@ -9,13 +9,13 @@ import {
 import { getCurrentUser } from "../services/auth.ts";
 import { getToken, setToken, removeToken } from "../utils/token.ts";
 
-interface User {
+export interface User {
   id: string;
   name: string;
   email: string;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAuthenticated: boolean;
