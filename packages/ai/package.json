@@ -9,10 +9,13 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
+    "@bestt/prompts": "*",
     "@bestt/types": "*",
-    "@bestt/prompts": "*"
+    "@google/genai": "^2.16.0",
+    "openai": "^7.4.0"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "typescript": "^5.3.3"
   }
 }
