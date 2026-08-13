@@ -1,17 +1,17 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import { env } from "./config/env";
 import path from "path";
 import healthRouter from './routes/health';
 import authRouter from './routes/auth';
 import courseRouter from "./routes/courses";
 import documentRouter from "./routes/documents";
-
+import chatRouter from "./routes/chat";
 // Load environment variables
-dotenv.config();
+const PORT = env.port;
+
 
 const app = express();
-const PORT = Number(process.env.PORT) || 5000;
 
 // Middleware
 app.use(
@@ -34,6 +34,7 @@ app.use('/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/courses', courseRouter);
 app.use('/api/documents', documentRouter);
+app.use("/api/chat", chatRouter);
 // Root endpoint
 app.get('/', (_req, res) => {
   res.status(200).json({
