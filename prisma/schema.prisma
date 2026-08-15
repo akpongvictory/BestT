@@ -109,7 +109,7 @@ model DocumentChunk {
 
   content String
 
-  embedding String?
+embedding Unsupported("vector(768)")?
 
   chunkIndex Int
 

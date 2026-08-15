@@ -1,11 +1,14 @@
 import fs from "fs/promises";
 import path from "path";
+import { randomUUID } from "crypto";
 
 import { PDFParse } from "pdf-parse";
+import { createEmbedding } from "@bestt/ai";
 
 import prisma from "../lib/prisma";
 
 const CHUNK_SIZE = 1500;
+const EMBEDDING_CONCURRENCY = 5;
 
 function createChunks(text: string): string[] {
   const normalizedText = text
@@ -24,7 +27,7 @@ function createChunks(text: string): string[] {
     .filter(Boolean);
 
   const chunks: string[] = [];
-  let currentChunk = ""; 
+  let currentChunk = "";
 
   for (const paragraph of paragraphs) {
     if (!currentChunk) {
@@ -75,6 +78,80 @@ function createChunks(text: string): string[] {
   return chunks;
 }
 
+/**
+ * Generates embeddings with controlled concurrency.
+ *
+ * Instead of sending every chunk simultaneously,
+ * we process a small number at a time.
+ */
+async function createEmbeddings(
+  chunks: string[]
+): Promise<number[][]> {
+  const embeddings: number[][] = new Array(
+    chunks.length
+  );
+
+  for (
+    let start = 0;
+    start < chunks.length;
+    start += EMBEDDING_CONCURRENCY
+  ) {
+    const batch = chunks.slice(
+      start,
+      start + EMBEDDING_CONCURRENCY
+    );
+
+    console.log(
+      `Generating embeddings ${start + 1}-${Math.min(
+        start + EMBEDDING_CONCURRENCY,
+        chunks.length
+      )} of ${chunks.length}...`
+    );
+
+    const batchEmbeddings = await Promise.all(
+      batch.map((chunk) => createEmbedding(chunk))
+    );
+
+    batchEmbeddings.forEach((embedding, index) => {
+      embeddings[start + index] = embedding;
+    });
+  }
+
+  return embeddings;
+}
+
+/**
+ * Stores a document chunk and its pgvector embedding.
+ *
+ * Prisma does not currently expose pgvector as a normal
+ * scalar type, so the vector itself is written using
+ * parameterized raw SQL.
+ */
+async function saveChunkWithEmbedding(
+  documentId: string,
+  content: string,
+  chunkIndex: number,
+  embedding: number[]
+): Promise<void> {
+  const id = randomUUID();
+
+  const vector = `[${embedding.join(",")}]`;
+
+  await prisma.$executeRaw`
+    INSERT INTO "DocumentChunk"
+      ("id", "content", "embedding", "chunkIndex", "documentId", "createdAt")
+    VALUES
+      (
+        ${id},
+        ${content},
+        ${vector}::vector,
+        ${chunkIndex},
+        ${documentId},
+        NOW()
+      )
+  `;
+}
+
 export async function processDocument(
   documentId: string
 ): Promise<void> {
@@ -122,19 +199,44 @@ export async function processDocument(
         );
       }
 
+      console.log(
+        `Document ${document.id}: ${chunks.length} chunks created.`
+      );
+
+      /*
+       * Remove previous chunks so re-processing a document
+       * never creates duplicate embeddings.
+       */
       await prisma.documentChunk.deleteMany({
         where: {
           documentId: document.id,
         },
       });
 
-      await prisma.documentChunk.createMany({
-        data: chunks.map((content, index) => ({
-          content,
-          chunkIndex: index,
-          documentId: document.id,
-        })),
-      });
+      /*
+       * Generate semantic embeddings.
+       */
+      const embeddings = await createEmbeddings(chunks);
+
+      console.log(
+        `Document ${document.id}: embeddings generated.`
+      );
+
+      /*
+       * Store chunks together with their vectors.
+       */
+      for (let index = 0; index < chunks.length; index++) {
+        await saveChunkWithEmbedding(
+          document.id,
+          chunks[index],
+          index,
+          embeddings[index]
+        );
+      }
+
+      console.log(
+        `Document ${document.id}: chunks stored in pgvector.`
+      );
 
       await prisma.document.update({
         where: {
@@ -156,6 +258,11 @@ export async function processDocument(
         processingStatus: "FAILED",
       },
     });
+
+    console.error(
+      `Document processing failed for ${document.id}:`,
+      error
+    );
 
     throw error;
   }

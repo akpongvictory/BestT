@@ -6,8 +6,12 @@ import {
   ReactNode,
 } from "react";
 
-import { getCurrentUser } from "../services/auth.ts";
-import { getToken, setToken, removeToken } from "../utils/token.ts";
+import { getCurrentUser } from "../services/auth";
+import {
+  getToken,
+  setToken,
+  removeToken,
+} from "../utils/token";
 
 export interface User {
   id: string;
