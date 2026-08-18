@@ -59,45 +59,38 @@ model Course {
 // ===============================
 // DOCUMENTS
 // ===============================
+enum DocumentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
 
 model Document {
   id String @id @default(uuid())
 
-  filename String
-
+  filename     String
   originalName String
-
-  fileUrl String
-
-  fileType String
-
-  fileSize Int?
+  fileUrl      String
+  fileType     String
+  fileSize     Int?
+  fileHash     String?
 
   processingStatus DocumentStatus @default(PENDING)
 
   courseId String
-
-  userId String
+  userId   String
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   chunks DocumentChunk[]
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
-}
 
-enum DocumentStatus {
-  PENDING
-
-  PROCESSING
-
-  COMPLETED
-
-  FAILED
+  @@unique([courseId, userId, fileHash])
+@@index([courseId, processingStatus])
 }
 
 // ===============================
@@ -109,7 +102,7 @@ model DocumentChunk {
 
   content String
 
-embedding Unsupported("vector(768)")?
+  embedding Unsupported("vector(768)")?
 
   chunkIndex Int
 
@@ -118,6 +111,8 @@ embedding Unsupported("vector(768)")?
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+
+  @@index([documentId])
 }
 
 // ===============================

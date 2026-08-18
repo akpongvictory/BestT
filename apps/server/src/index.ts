@@ -8,6 +8,7 @@ import courseRouter from "./routes/courses";
 import documentRouter from "./routes/documents";
 import chatRouter from "./routes/chat";
 // Load environment variables
+
 const PORT = env.port;
 
 

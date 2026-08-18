@@ -3,12 +3,13 @@ import path from "path";
 import { randomUUID } from "crypto";
 
 import { PDFParse } from "pdf-parse";
-import { createEmbedding } from "@bestt/ai";
+import {
+  createEmbeddings as generateEmbeddings,
+} from "@bestt/ai";
 
 import prisma from "../lib/prisma";
 
 const CHUNK_SIZE = 1500;
-const EMBEDDING_CONCURRENCY = 5;
 
 function createChunks(text: string): string[] {
   const normalizedText = text
@@ -79,43 +80,35 @@ function createChunks(text: string): string[] {
 }
 
 /**
- * Generates embeddings with controlled concurrency.
+ * Generates embeddings for all document chunks.
  *
- * Instead of sending every chunk simultaneously,
- * we process a small number at a time.
+ * The actual embedding implementation is provided by
+ * @bestt/ai. This wrapper avoids maintaining another
+ * batching/concurrency implementation in this service.
  */
 async function createEmbeddings(
   chunks: string[]
 ): Promise<number[][]> {
-  const embeddings: number[][] = new Array(
-    chunks.length
+  if (chunks.length === 0) {
+    return [];
+  }
+
+  console.log(
+    `Generating embeddings for ${chunks.length} chunks...`
   );
 
-  for (
-    let start = 0;
-    start < chunks.length;
-    start += EMBEDDING_CONCURRENCY
-  ) {
-    const batch = chunks.slice(
-      start,
-      start + EMBEDDING_CONCURRENCY
-    );
+  const embeddings =
+    await generateEmbeddings(chunks);
 
-    console.log(
-      `Generating embeddings ${start + 1}-${Math.min(
-        start + EMBEDDING_CONCURRENCY,
-        chunks.length
-      )} of ${chunks.length}...`
+  if (embeddings.length !== chunks.length) {
+    throw new Error(
+      `Embedding count mismatch. Expected ${chunks.length}, got ${embeddings.length}.`
     );
-
-    const batchEmbeddings = await Promise.all(
-      batch.map((chunk) => createEmbedding(chunk))
-    );
-
-    batchEmbeddings.forEach((embedding, index) => {
-      embeddings[start + index] = embedding;
-    });
   }
+
+  console.log(
+    `Generated ${embeddings.length} embeddings.`
+  );
 
   return embeddings;
 }
@@ -133,13 +126,26 @@ async function saveChunkWithEmbedding(
   chunkIndex: number,
   embedding: number[]
 ): Promise<void> {
+  if (!embedding.length) {
+    throw new Error(
+      "Failed to generate document chunk embedding."
+    );
+  }
+
   const id = randomUUID();
 
   const vector = `[${embedding.join(",")}]`;
 
   await prisma.$executeRaw`
     INSERT INTO "DocumentChunk"
-      ("id", "content", "embedding", "chunkIndex", "documentId", "createdAt")
+      (
+        "id",
+        "content",
+        "embedding",
+        "chunkIndex",
+        "documentId",
+        "createdAt"
+      )
     VALUES
       (
         ${id},
@@ -214,23 +220,45 @@ export async function processDocument(
       });
 
       /*
-       * Generate semantic embeddings.
+       * Generate embeddings for all document chunks.
        */
-      const embeddings = await createEmbeddings(chunks);
+      const embeddings =
+        await createEmbeddings(chunks);
 
       console.log(
         `Document ${document.id}: embeddings generated.`
       );
 
       /*
+       * Make sure every chunk has a corresponding embedding.
+       */
+      if (embeddings.length !== chunks.length) {
+        throw new Error(
+          "The number of generated embeddings does not match the number of document chunks."
+        );
+      }
+
+      /*
        * Store chunks together with their vectors.
        */
-      for (let index = 0; index < chunks.length; index++) {
+      for (
+        let index = 0;
+        index < chunks.length;
+        index++
+      ) {
+        const embedding = embeddings[index];
+
+        if (!embedding?.length) {
+          throw new Error(
+            `Failed to generate embedding for chunk ${index}.`
+          );
+        }
+
         await saveChunkWithEmbedding(
           document.id,
           chunks[index],
           index,
-          embeddings[index]
+          embedding
         );
       }
 

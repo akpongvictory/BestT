@@ -1,28 +1,44 @@
 import api from "../lib/api";
 
+export interface CourseDocument {
+  id: string;
+  filename: string;
+  originalName: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize?: number | null;
+  processingStatus:
+    | "PENDING"
+    | "PROCESSING"
+    | "COMPLETED"
+    | "FAILED";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Course {
   id: string;
   title: string;
   description?: string;
   createdAt: string;
+  updatedAt?: string;
 
-  documents: {
-    id: string;
-    filename: string;
-  }[];
+  documents: CourseDocument[];
 
-  _count: {
+  _count?: {
     documents: number;
   };
 }
 
 export const getCourses = async () => {
   const res = await api.get("/courses");
+
   return res.data.data as Course[];
 };
 
 export const getCourse = async (id: string) => {
   const res = await api.get(`/courses/${id}`);
+
   return res.data.data as Course;
 };
 
@@ -31,7 +47,8 @@ export const createCourse = async (data: {
   description?: string;
 }) => {
   const res = await api.post("/courses", data);
-  return res.data.data;
+
+  return res.data.data as Course;
 };
 
 export const updateCourse = async (
@@ -41,10 +58,16 @@ export const updateCourse = async (
     description?: string;
   }
 ) => {
-  const res = await api.patch(`/courses/${id}`, data);
-  return res.data.data;
+  const res = await api.patch(
+    `/courses/${id}`,
+    data
+  );
+
+  return res.data.data as Course;
 };
 
-export const deleteCourse = async (id: string) => {
+export const deleteCourse = async (
+  id: string
+) => {
   await api.delete(`/courses/${id}`);
 };

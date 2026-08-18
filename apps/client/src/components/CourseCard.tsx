@@ -39,8 +39,10 @@ export default function CourseCard({
       <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
         <span className="flex items-center gap-2 text-xs font-medium text-slate-500">
           <FileText size={14} />
-          {course._count.documents}{" "}
-          {course._count.documents === 1 ? "document" : "documents"}
+          {course._count?.documents ?? 0}{" "}
+	{(course._count?.documents ?? 0) === 1
+ 	 ? "document"
+ 	 : "documents"}
         </span>
 
         <span className="text-xs font-semibold text-blue-600 opacity-0 transition-opacity duration-200 group-hover:opacity-100">

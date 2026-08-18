@@ -2,28 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  .glass-card {
-    background: rgba(17, 24, 39, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-  
-  .glass-card-hover {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  .glass-card-hover:hover {
-    background: rgba(30, 41, 59, 0.8);
-    border-color: rgba(99, 102, 241, 0.3);
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.15);
+@layer base {
+  html {
+    scroll-behavior: smooth;
   }
 
-  .bg-grid-pattern {
-    background-size: 40px 40px;
-    background-image: 
-      linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  body {
+    margin: 0;
+    background: #f6f8fc;
+    color: #0d1b3e;
+    font-family:
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+  }
+
+  button,
+  input,
+  textarea {
+    font: inherit;
+  }
+
+  ::selection {
+    background: rgba(59, 130, 246, 0.18);
+    color: #0d1b3e;
+  }
+}
+
+@layer utilities {
+  .brand-gradient {
+    background: linear-gradient(
+      135deg,
+      #2563eb 0%,
+      #4f46e5 48%,
+      #7c3aed 100%
+    );
+  }
+
+  .brand-text-gradient {
+    background: linear-gradient(
+      135deg,
+      #38bdf8 0%,
+      #60a5fa 45%,
+      #a78bfa 100%
+    );
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  .soft-brand-glow {
+    box-shadow:
+      0 20px 60px rgba(37, 99, 235, 0.08),
+      0 8px 30px rgba(124, 58, 237, 0.05);
+  }
+
+  .animate-float {
+    animation: bestt-float 5s ease-in-out infinite;
+  }
+
+  @keyframes bestt-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-6px);
+    }
   }
 }

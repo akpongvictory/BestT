@@ -4,7 +4,10 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "composite": true,
-    "types": ["node"]
+    "module": "Node16",
+    "moduleResolution": "node16",
+    "types": ["node"],
+    "isolatedModules": false
   },
   "include": ["src/**/*"],
   "references": [
@@ -12,4 +15,3 @@
     { "path": "../prompts" }
   ]
 }
-

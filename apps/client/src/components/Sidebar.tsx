@@ -50,7 +50,7 @@ export default function Sidebar() {
               <NavLink
                 key={link.name}
                 to={link.path}
-                className={({ isActive }: { isActive: boolean }) =>
+              className={({ isActive }: { isActive: boolean }) =>
                   [
                     "group flex items-center gap-3 rounded-xl px-3.5 py-3",
                     "text-sm font-medium transition-all duration-200",
@@ -60,7 +60,7 @@ export default function Sidebar() {
                   ].join(" ")
                 }
               >
-                {({ isActive }: { isActive: boolean }) => (
+               {({ isActive }: { isActive: boolean }) => (
                   <>
                     <span
                       className={[
@@ -88,12 +88,11 @@ export default function Sidebar() {
           <Sparkles size={18} className="text-cyan-300" />
         </div>
 
-        <p className="text-sm font-semibold">
-          BestT Tutor
-        </p>
+        <p className="text-sm font-semibold">BestT Tutor</p>
 
         <p className="mt-1 text-xs leading-5 text-slate-300">
-          Your materials are ready. Ask questions, explore ideas and learn at your own pace.
+          Your materials are ready. Ask questions, explore ideas and learn at
+          your own pace.
         </p>
       </div>
     </aside>
