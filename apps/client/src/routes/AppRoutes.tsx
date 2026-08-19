@@ -9,6 +9,7 @@ import Study from "../pages/Study";
 import Quiz from "../pages/Quiz";
 
 import ProtectedRoute from "./ProtectedRoute";
+import Chat from "../pages/Chat";
 
 export default function AppRoutes() {
   return (
@@ -39,6 +40,8 @@ export default function AppRoutes() {
         }
       />
 
+
+
       <Route
         path="/study/:courseId"
         element={
@@ -47,6 +50,15 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+              <Route
+      path="/study/:courseId/chat"
+      element={
+        <ProtectedRoute>
+          <Chat />
+        </ProtectedRoute>
+      }
+    />
 
       <Route
         path="/quiz/:courseId"

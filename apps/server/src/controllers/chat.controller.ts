@@ -1,15 +1,25 @@
+// chat.controller.ts
+
 import { Response } from "express";
 import { BestTTutorAgent } from "@bestt/ai";
+import prisma from "../lib/prisma";
 
 import { env } from "../config/env";
 import { AuthRequest } from "../middleware/auth";
 import { extractUrlContent } from "../services/content.service";
 import { searchSimilarChunks } from "../services/embedding-search.service";
 
+
+// ==================================================
+// AI TUTOR CONFIGURATION
+// ==================================================
+
 const tutor = new BestTTutorAgent({
   provider: env.aiProvider as
+    | "auto"
     | "gemini"
     | "groq"
+    | "huggingface"
     | "openai"
     | "openrouter"
     | "cerebras",
@@ -19,6 +29,9 @@ const tutor = new BestTTutorAgent({
 
   groqApiKey: env.groqApiKey,
   groqModel: env.groqModel,
+
+  huggingfaceApiKey: env.huggingfaceApiKey,
+  huggingfaceModel: env.huggingfaceModel,
 
   openaiApiKey: env.openaiApiKey,
   openaiModel: env.openaiModel,
@@ -30,24 +43,112 @@ const tutor = new BestTTutorAgent({
   cerebrasModel: env.cerebrasModel,
 });
 
+
+// ==================================================
+// LIMITS
+// ==================================================
+
 const MAX_QUESTION_LENGTH = 4000;
 const MAX_CONTEXT_LENGTH = 30000;
+
+// ==================================================
+// GET CHAT HISTORY
+// ==================================================
+
+export async function getChatHistory(
+  req: AuthRequest,
+  res: Response
+) {
+  try {
+    const { courseId } = req.params;
+
+    if (!req.user?.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    if (!courseId || typeof courseId !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Course ID is required.",
+      });
+    }
+
+    const session = await prisma.chatSession.findFirst({
+      where: {
+        userId: req.user.id,
+        courseId,
+      },
+      include: {
+        messages: {
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
+      },
+    });
+
+    if (!session) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          sessionId: null,
+          messages: [],
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        sessionId: session.id,
+        messages: session.messages.map((message) => ({
+          id: message.id,
+          role:
+            message.role === "USER"
+              ? "user"
+              : "assistant",
+          content: message.content,
+          createdAt: message.createdAt,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error(
+      "[CHAT HISTORY] Failed to load history:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load chat history.",
+    });
+  }
+}
+
+// ==================================================
+// CHAT WITH TUTOR
+// ==================================================
 
 export async function chatWithTutor(
   req: AuthRequest,
   res: Response
 ) {
   try {
-    const {
-      question,
-      courseId,
-      context,
-      url,
-    } = req.body;
+    console.log("[CHAT] Sending 200 response");
+   const {
+  question,
+  courseId,
+  sessionId,
+  context,
+  url,
+} = req.body;
 
-    // --------------------------------------------------
-    // Validate question
-    // --------------------------------------------------
+    // ==================================================
+    // VALIDATE QUESTION
+    // ==================================================
 
     if (
       !question ||
@@ -67,9 +168,10 @@ export async function chatWithTutor(
       });
     }
 
-    // --------------------------------------------------
-    // Validate courseId
-    // --------------------------------------------------
+
+    // ==================================================
+    // VALIDATE COURSE ID
+    // ==================================================
 
     if (
       courseId !== undefined &&
@@ -81,9 +183,10 @@ export async function chatWithTutor(
       });
     }
 
-    // --------------------------------------------------
-    // RAG course path
-    // --------------------------------------------------
+
+      // ==================================================
+    // RAG COURSE PATH
+    // ==================================================
 
     if (courseId) {
       if (!req.user?.id) {
@@ -93,14 +196,82 @@ export async function chatWithTutor(
         });
       }
 
-      const similarChunks =
+      // --------------------------------------------------
+      // VERIFY COURSE BELONGS TO USER
+      // --------------------------------------------------
+
+      const course = await prisma.course.findFirst({
+        where: {
+          id: courseId,
+          userId: req.user.id,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!course) {
+        return res.status(404).json({
+          success: false,
+          message: "Course not found.",
+        });
+      }
+
+      // --------------------------------------------------
+      // FIND OR CREATE CHAT SESSION
+      // --------------------------------------------------
+
+      let chatSession;
+
+      if (sessionId) {
+        chatSession = await prisma.chatSession.findFirst({
+          where: {
+            id: sessionId,
+            userId: req.user.id,
+            courseId,
+          },
+        });
+
+        if (!chatSession) {
+          return res.status(404).json({
+            success: false,
+            message: "Chat session not found.",
+          });
+        }
+      } else {
+        chatSession = await prisma.chatSession.create({
+          data: {
+            userId: req.user.id,
+            courseId,
+            title: question.trim().slice(0, 80),
+          },
+        });
+      }
+
+      // --------------------------------------------------
+      // SAVE USER MESSAGE
+      // --------------------------------------------------
+
+      await prisma.chatMessage.create({
+        data: {
+          sessionId: chatSession.id,
+          role: "USER",
+          content: question.trim(),
+        },
+      });
+
+      // --------------------------------------------------
+      // SEARCH SIMILAR COURSE CHUNKS
+      // --------------------------------------------------
+          const similarChunks =
         await searchSimilarChunks({
           question: question.trim(),
           courseId,
           userId: req.user.id,
           limit: 5,
-          minSimilarity: 0.45,
+          minSimilarity: 0,
         });
+
 
       if (similarChunks.length === 0) {
         return res.status(404).json({
@@ -109,6 +280,11 @@ export async function chatWithTutor(
             "No relevant indexed course material was found. Make sure your documents have finished processing, then try again.",
         });
       }
+
+
+      // --------------------------------------------------
+      // BUILD TUTOR CONTEXT
+      // --------------------------------------------------
 
       const tutorContext = similarChunks
         .map((chunk, index) => {
@@ -123,14 +299,59 @@ export async function chatWithTutor(
         })
         .join("\n\n====================\n\n");
 
+
+      // ==================================================
+      // CALL AI TUTOR
+      // ==================================================
+
+      console.log(
+        "[CHAT] Calling BestTTutorAgent.answer()"
+      );
+
       const answer = await tutor.answer({
         question: question.trim(),
         context: tutorContext,
       });
 
-      return res.status(200).json({
+      // --------------------------------------------------
+// SAVE ASSISTANT MESSAGE
+// --------------------------------------------------
+
+const assistantMessage =
+  await prisma.chatMessage.create({
+    data: {
+      sessionId: chatSession.id,
+      role: "ASSISTANT",
+      content: answer,
+    },
+  });
+
+
+      // ==================================================
+      // AI RESPONSE COMPLETED
+      // ==================================================
+
+      console.log(
+        "[CHAT] BestTTutorAgent.answer() completed",
+        {
+          answerLength: answer?.length,
+        }
+      );
+
+
+      // ==================================================
+      // SEND RESPONSE TO BROWSER
+      // ==================================================
+
+      console.log(
+        "[CHAT] Sending 200 response"
+      );
+
+          return res.status(200).json({
         success: true,
         data: {
+          sessionId: chatSession.id,
+          messageId: assistantMessage.id,
           answer,
           sources: similarChunks.map((chunk) => ({
             documentId: chunk.documentId,
@@ -142,9 +363,10 @@ export async function chatWithTutor(
       });
     }
 
-    // --------------------------------------------------
-    // Legacy context / URL path
-    // --------------------------------------------------
+
+    // ==================================================
+    // LEGACY CONTEXT / URL PATH
+    // ==================================================
 
     if (
       context !== undefined &&
@@ -156,6 +378,7 @@ export async function chatWithTutor(
       });
     }
 
+
     if (
       url !== undefined &&
       typeof url !== "string"
@@ -165,6 +388,7 @@ export async function chatWithTutor(
         message: "URL must be a string.",
       });
     }
+
 
     if (
       context &&
@@ -176,6 +400,7 @@ export async function chatWithTutor(
       });
     }
 
+
     if (!context && !url) {
       return res.status(400).json({
         success: false,
@@ -184,6 +409,11 @@ export async function chatWithTutor(
       });
     }
 
+
+    // ==================================================
+    // PREPARE TUTOR CONTEXT
+    // ==================================================
+
     let tutorContext = context;
 
     if (url) {
@@ -191,16 +421,51 @@ export async function chatWithTutor(
 
       tutorContext = extracted.content;
 
-      if (tutorContext.length > MAX_CONTEXT_LENGTH) {
+      if (
+        tutorContext.length > MAX_CONTEXT_LENGTH
+      ) {
         tutorContext =
-          tutorContext.slice(0, MAX_CONTEXT_LENGTH);
+          tutorContext.slice(
+            0,
+            MAX_CONTEXT_LENGTH
+          );
       }
     }
+
+
+    // ==================================================
+    // CALL AI TUTOR
+    // ==================================================
+
+    console.log(
+      "[CHAT] Calling BestTTutorAgent.answer()"
+    );
 
     const answer = await tutor.answer({
       question: question.trim(),
       context: tutorContext ?? "",
     });
+
+
+    // ==================================================
+    // AI RESPONSE COMPLETED
+    // ==================================================
+
+    console.log(
+      "[CHAT] BestTTutorAgent.answer() completed",
+      {
+        answerLength: answer?.length,
+      }
+    );
+
+
+    // ==================================================
+    // SEND RESPONSE TO BROWSER
+    // ==================================================
+
+    console.log(
+      "[CHAT] Sending 200 response"
+    );
 
     return res.status(200).json({
       success: true,
@@ -208,22 +473,37 @@ export async function chatWithTutor(
         answer,
       },
     });
+
   } catch (error) {
-    console.error("========== CHAT ERROR ==========");
+
+    // ==================================================
+    // ERROR HANDLING
+    // ==================================================
+
+    console.error(
+      "========== CHAT ERROR =========="
+    );
 
     if (error instanceof Error) {
       console.error("NAME:", error.name);
       console.error("MESSAGE:", error.message);
       console.error("STACK:", error.stack);
     } else {
-      console.error("UNKNOWN ERROR:", error);
+      console.error(
+        "UNKNOWN ERROR:",
+        error
+      );
     }
 
-    console.error("================================");
+    console.error(
+      "================================"
+    );
+
 
     return res.status(500).json({
       success: false,
-      message: "Failed to generate tutor response.",
+      message:
+        "Failed to generate tutor response.",
     });
   }
 }

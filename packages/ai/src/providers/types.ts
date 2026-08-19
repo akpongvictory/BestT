@@ -1,6 +1,7 @@
 export type LLMProviderName =
   | "gemini"
   | "groq"
+  | "huggingface"
   | "openai"
   | "openrouter"
   | "cerebras";

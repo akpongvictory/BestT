@@ -1,5 +1,6 @@
 import { GeminiProvider } from "./gemini.js";
 import { GroqProvider } from "./groq.js";
+import { HuggingFaceProvider } from "./huggingface.js";
 import { OpenAICompatibleProvider } from "./openai-compatible.js";
 import { ProviderRouter } from "./router.js";
 import { LLMProvider } from "./types.js";
@@ -27,6 +28,9 @@ export interface CreateLLMProviderConfig {
 
   cerebrasApiKey?: string;
   cerebrasModel?: string;
+
+  huggingfaceApiKey?: string;
+  huggingfaceModel?: string;
 }
 
 export function createLLMProvider(
@@ -60,6 +64,20 @@ export function createLLMProvider(
           config.groqModel ??
           "llama-3.3-70b-versatile",
       });
+
+      case "huggingface":
+  if (!config.huggingfaceApiKey) {
+    throw new Error(
+      "HUGGINGFACE_API_KEY is not configured."
+    );
+  }
+
+  return new HuggingFaceProvider({
+    apiKey: config.huggingfaceApiKey,
+    modelName:
+      config.huggingfaceModel ??
+      "meta-llama/Llama-3.2-3B-Instruct",
+  });
 
     case "openai":
       if (!config.openaiApiKey) {
@@ -133,8 +151,9 @@ export function createLLMRouter(
 
       const order =
       config.providerOrder ?? [
-        "gemini",
         "groq",
+        "huggingface",
+      
       ];
 
   for (const provider of order) {
@@ -144,16 +163,18 @@ export function createLLMRouter(
       continue;
     }
 
-    const apiKey =
-      provider === "gemini"
-        ? config.geminiApiKey
-        : provider === "groq"
-        ? config.groqApiKey
-        : provider === "openrouter"
-        ? config.openrouterApiKey
-        : provider === "cerebras"
-        ? config.cerebrasApiKey
-        : undefined;
+   const apiKey =
+  provider === "gemini"
+    ? config.geminiApiKey
+    : provider === "groq"
+    ? config.groqApiKey
+    : provider === "huggingface"
+    ? config.huggingfaceApiKey
+    : provider === "openrouter"
+    ? config.openrouterApiKey
+    : provider === "cerebras"
+    ? config.cerebrasApiKey
+    : undefined;
 
     if (!apiKey) {
       continue;
@@ -177,6 +198,12 @@ export function createLLMRouter(
 
         openaiApiKey:
           config.openaiApiKey,
+
+            huggingfaceApiKey:
+         config.huggingfaceApiKey,
+
+         huggingfaceModel:
+         config.huggingfaceModel,
 
         openaiModel:
           config.openaiModel,

@@ -1,275 +1,220 @@
-import OpenAI from "openai";
-
-const GEMINI_EMBEDDING_MODEL =
-  process.env.GEMINI_EMBEDDING_MODEL ||
-  "gemini-embedding-001";
-
-const OPENAI_EMBEDDING_MODEL =
-  process.env.OPENAI_EMBEDDING_MODEL ||
-  "text-embedding-3-small";
+const JINA_EMBEDDING_MODEL =
+  process.env.JINA_EMBEDDING_MODEL ||
+  "jina-embeddings-v5-text-nano";
 
 const EMBEDDING_DIMENSION = 768;
+const JINA_API_URL = "https://api.jina.ai/v1/embeddings";
 
-type EmbeddingProvider = "gemini" | "openai";
+// Keep requests comfortably below Jina's free-tier limits.
+const JINA_BATCH_SIZE = 64;
 
-function isQuotaOrRateLimitError(error: unknown): boolean {
-  if (!error) {
-    return false;
+type EmbeddingTask = "retrieval.passage" | "retrieval.query";
+
+function getJinaApiKey(): string {
+  const apiKey = process.env.JINA_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(
+      "JINA_API_KEY is not configured."
+    );
   }
 
-  const candidate = error as {
-    status?: number;
-    message?: string;
-    error?: {
-      code?: number | string;
-      status?: string;
+  return apiKey;
+}
+
+function getJinaErrorMessage(
+  body: unknown
+): string {
+  if (
+    typeof body === "object" &&
+    body !== null
+  ) {
+    const candidate = body as {
+      detail?: string;
+      message?: string;
+      error?: {
+        message?: string;
+      };
     };
-  };
 
-  const status =
-    candidate.status ??
-    candidate.error?.code;
-
-  if (
-    status === 429 ||
-    status === "429"
-  ) {
-    return true;
-  }
-
-  const message =
-    candidate.message?.toLowerCase() ?? "";
-
-  return (
-    message.includes("quota") ||
-    message.includes("rate limit") ||
-    message.includes("resource_exhausted") ||
-    message.includes("too many requests")
-  );
-}
-
-function getEmbeddingProviderOrder(): EmbeddingProvider[] {
-  const configured =
-    (
-      process.env.AI_PROVIDER ??
-      "auto"
-    ).toLowerCase();
-
-  if (configured === "openai") {
-    return ["openai"];
-  }
-
-  if (configured === "gemini") {
-    return ["gemini"];
-  }
-
-  // AUTO:
-  //
-  // Gemini is preferred when available.
-  // OpenAI is the fallback for embeddings because
-  // it provides a compatible 768-dimensional output.
-  return ["gemini", "openai"];
-}
-
-async function getGeminiClient() {
-  const apiKey =
-    process.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error(
-      "GEMINI_API_KEY is not configured."
+    return (
+      candidate.error?.message ??
+      candidate.detail ??
+      candidate.message ??
+      JSON.stringify(body)
     );
   }
 
-  const { GoogleGenAI } =
-    await import("@google/genai");
-
-  return new GoogleGenAI({
-    apiKey,
-  });
+  return String(body);
 }
 
-function getOpenAIClient() {
-  const apiKey =
-    process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error(
-      "OPENAI_API_KEY is not configured."
-    );
-  }
-
-  return new OpenAI({
-    apiKey,
-  });
-}
-
-async function createGeminiEmbeddings(
-  texts: string[]
-): Promise<number[][]> {
-  const ai = await getGeminiClient();
-
-  const response =
-    await ai.models.embedContent({
-      model: GEMINI_EMBEDDING_MODEL,
-      contents: texts,
-      config: {
-        outputDimensionality:
-          EMBEDDING_DIMENSION,
-
-        taskType:
-          "RETRIEVAL_DOCUMENT",
-      },
-    });
-
-  const embeddings =
-    response.embeddings?.map(
-      (embedding) =>
-        embedding.values ?? []
-    ) ?? [];
-
-  if (
-    embeddings.length !== texts.length ||
-    embeddings.some(
-      (embedding) =>
-        embedding.length !==
-        EMBEDDING_DIMENSION
-    )
-  ) {
-    throw new Error(
-      "Gemini returned an invalid number or dimension of embeddings."
-    );
-  }
-
-  return embeddings;
-}
-
-async function createOpenAIEmbeddings(
-  texts: string[]
-): Promise<number[][]> {
-  const client =
-    getOpenAIClient();
-
-  const response =
-    await client.embeddings.create({
-      model: OPENAI_EMBEDDING_MODEL,
-      input: texts,
-      dimensions: EMBEDDING_DIMENSION,
-    });
-
-  const embeddings =
-    response.data
-      .sort((a, b) => a.index - b.index)
-      .map((item) => item.embedding);
-
-  if (
-    embeddings.length !== texts.length ||
-    embeddings.some(
-      (embedding) =>
-        embedding.length !==
-        EMBEDDING_DIMENSION
-    )
-  ) {
-    throw new Error(
-      "OpenAI returned an invalid number or dimension of embeddings."
-    );
-  }
-
-  return embeddings;
-}
-
-async function createEmbeddingsWithProvider(
-  provider: EmbeddingProvider,
-  texts: string[]
-): Promise<number[][]> {
-  if (provider === "gemini") {
-    return createGeminiEmbeddings(texts);
-  }
-
-  return createOpenAIEmbeddings(texts);
-}
-
-/**
- * Generate embeddings for multiple texts.
- *
- * IMPORTANT:
- * The entire batch uses one provider.
- * We never mix Gemini and OpenAI embeddings
- * inside the same indexing operation.
- */
-export async function createEmbeddings(
-  texts: string[]
+async function createJinaEmbeddings(
+  texts: string[],
+  task: EmbeddingTask
 ): Promise<number[][]> {
   if (texts.length === 0) {
     return [];
   }
 
-  const providers =
-    getEmbeddingProviderOrder();
+  const apiKey = getJinaApiKey();
 
-  let lastError: unknown;
+  const allEmbeddings: number[][] = [];
 
-  for (const provider of providers) {
-    try {
-      console.log(
-        `Embedding provider: ${provider}`
-      );
+  for (
+    let start = 0;
+    start < texts.length;
+    start += JINA_BATCH_SIZE
+  ) {
+    const batch = texts.slice(
+      start,
+      start + JINA_BATCH_SIZE
+    );
 
-      return await createEmbeddingsWithProvider(
-        provider,
-        texts
-      );
-    } catch (error) {
-      lastError = error;
+    const batchNumber =
+      Math.floor(
+        start / JINA_BATCH_SIZE
+      ) + 1;
 
-      console.error(
-        `Embedding provider "${provider}" failed:`,
-        error
-      );
+    console.log(
+      `[Jina Embeddings] Processing batch ${batchNumber}: ${batch.length} chunks`
+    );
 
-      const shouldFailover =
-        provider === "gemini" &&
-        isQuotaOrRateLimitError(error);
+    const response = await fetch(
+      JINA_API_URL,
+      {
+        method: "POST",
 
-      if (!shouldFailover) {
-        throw error;
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          model: JINA_EMBEDDING_MODEL,
+          input: batch,
+          task,
+          dimensions: EMBEDDING_DIMENSION,
+          normalized: true,
+          embedding_type: "float",
+        }),
       }
+    );
 
-      console.warn(
-        "Gemini embedding quota/rate limit reached. Falling back to OpenAI embeddings."
+    const responseText =
+      await response.text();
+
+    let responseBody: unknown;
+
+    try {
+      responseBody =
+        JSON.parse(responseText);
+    } catch {
+      responseBody = responseText;
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        `Jina embedding API failed with HTTP ${response.status}: ${getJinaErrorMessage(
+          responseBody
+        )}`
       );
     }
+
+    const data =
+      responseBody as {
+        data?: Array<{
+          index: number;
+          embedding: number[];
+        }>;
+      };
+
+    const batchEmbeddings =
+      data.data
+        ?.sort(
+          (a, b) =>
+            a.index - b.index
+        )
+        .map(
+          (item) =>
+            item.embedding
+        ) ?? [];
+
+    if (
+      batchEmbeddings.length !==
+        batch.length ||
+      batchEmbeddings.some(
+        (embedding) =>
+          embedding.length !==
+          EMBEDDING_DIMENSION
+      )
+    ) {
+      throw new Error(
+        `Jina returned an invalid number or dimension of embeddings for batch ${batchNumber}. Expected ${batch.length} embeddings of ${EMBEDDING_DIMENSION} dimensions.`
+      );
+    }
+
+    allEmbeddings.push(
+      ...batchEmbeddings
+    );
   }
 
-  throw (
-    lastError ??
-    new Error(
-      "All embedding providers failed."
-    )
+  if (
+    allEmbeddings.length !==
+    texts.length
+  ) {
+    throw new Error(
+      `Jina returned ${allEmbeddings.length} embeddings for ${texts.length} texts.`
+    );
+  }
+
+  return allEmbeddings;
+}
+
+/**
+ * Generate embeddings for multiple document chunks.
+ *
+ * Documents use the retrieval.passage task.
+ *
+ * IMPORTANT:
+ * The entire indexing operation uses Jina.
+ * We never mix embedding providers inside
+ * the same indexing operation.
+ */
+export async function createEmbeddings(
+  texts: string[]
+): Promise<number[][]> {
+  return createJinaEmbeddings(
+    texts,
+    "retrieval.passage"
   );
 }
 
 /**
- * Generate an embedding for a single query.
+ * Generate an embedding for a search query.
  *
- * Query embeddings use the same provider-selection
- * mechanism as document embeddings.
+ * Queries use retrieval.query so that the
+ * embedding model optimizes the vector for
+ * document retrieval.
  */
 export async function createEmbedding(
   text: string
 ): Promise<number[]> {
   const embeddings =
-    await createEmbeddings([text]);
+    await createJinaEmbeddings(
+      [text],
+      "retrieval.query"
+    );
 
   const embedding =
     embeddings[0];
 
   if (
     !embedding ||
-    embedding.length === 0
+    embedding.length !==
+      EMBEDDING_DIMENSION
   ) {
     throw new Error(
-      "Embedding provider returned an empty embedding."
+      `Jina returned an invalid query embedding. Expected ${EMBEDDING_DIMENSION} dimensions.`
     );
   }
 

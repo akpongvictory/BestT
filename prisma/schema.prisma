@@ -51,6 +51,8 @@ model Course {
 
   quizzes Quiz[]
 
+  chatSessions ChatSession[]
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -125,14 +127,18 @@ model ChatSession {
   title String?
 
   userId String
+  courseId String
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   messages ChatMessage[]
 
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
+
+  @@index([userId, courseId])
 }
 
 model ChatMessage {

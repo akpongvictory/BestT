@@ -35,6 +35,14 @@ app.use('/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/courses', courseRouter);
 app.use('/api/documents', documentRouter);
+
+// Debugging middleware to log incoming requests
+app.use((req, _res, next) => {
+  console.log(
+    `[REQUEST] ${req.method} ${req.originalUrl}`
+  );
+  next();
+});
 app.use("/api/chat", chatRouter);
 // Root endpoint
 app.get('/', (_req, res) => {
