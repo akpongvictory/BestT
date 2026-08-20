@@ -6,14 +6,13 @@ import {
   uploadDocument,
   removeDocument,
 } from "../controllers/document.controller";
-
+import { addSource } from "../controllers/source.controller";
 const router = Router();
 
 router.post(
-  "/upload",
+  "/source",
   authenticate,
-  upload.single("file"),
-  uploadDocument
+  addSource
 );
 
 router.delete(
@@ -21,5 +20,7 @@ router.delete(
   authenticate,
   removeDocument
 );
+
+
 
 export default router;

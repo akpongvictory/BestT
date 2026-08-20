@@ -5,11 +5,23 @@ import crypto from "crypto";
 import prisma from "../lib/prisma";
 
 async function main() {
-  const documents = await prisma.document.findMany();
+  const documents = await prisma.document.findMany({
+    where: {
+      type: "FILE",
+      fileUrl: {
+        not: null,
+      },
+    },
+  });
 
-  console.log(`Found ${documents.length} documents.`);
+  console.log(`Found ${documents.length} file documents.`);
 
   for (const document of documents) {
+    // Only FILE documents with a file URL can have a file hash.
+    if (document.type !== "FILE" || !document.fileUrl) {
+      continue;
+    }
+
     const filename = path.basename(document.fileUrl);
 
     const filePath = path.resolve(

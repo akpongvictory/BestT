@@ -3,12 +3,14 @@ const JINA_EMBEDDING_MODEL =
   "jina-embeddings-v5-text-nano";
 
 const EMBEDDING_DIMENSION = 768;
-const JINA_API_URL = "https://api.jina.ai/v1/embeddings";
+const JINA_API_URL =
+  "https://api.jina.ai/v1/embeddings";
 
-// Keep requests comfortably below Jina's free-tier limits.
-const JINA_BATCH_SIZE = 64;
+const JINA_BATCH_SIZE = 16;
 
-type EmbeddingTask = "retrieval.passage" | "retrieval.query";
+type EmbeddingTask =
+  | "retrieval.passage"
+  | "retrieval.query";
 
 function getJinaApiKey(): string {
   const apiKey = process.env.JINA_API_KEY;
@@ -30,19 +32,28 @@ function getJinaErrorMessage(
     body !== null
   ) {
     const candidate = body as {
-      detail?: string;
-      message?: string;
-      error?: {
-        message?: string;
-      };
+      detail?: unknown;
+      message?: unknown;
+      error?: unknown;
     };
 
-    return (
-      candidate.error?.message ??
-      candidate.detail ??
-      candidate.message ??
-      JSON.stringify(body)
-    );
+    const detail = candidate.detail;
+    const message = candidate.message;
+    const error = candidate.error;
+
+    if (typeof detail === "string") {
+      return detail;
+    }
+
+    if (typeof message === "string") {
+      return message;
+    }
+
+    if (typeof error === "string") {
+      return error;
+    }
+
+    return JSON.stringify(body);
   }
 
   return String(body);
@@ -114,9 +125,7 @@ async function createJinaEmbeddings(
 
     if (!response.ok) {
       throw new Error(
-        `Jina embedding API failed with HTTP ${response.status}: ${getJinaErrorMessage(
-          responseBody
-        )}`
+        `Jina embedding API failed with HTTP ${response.status}: ${JSON.stringify(responseBody, null, 2)}`
       );
     }
 
@@ -170,16 +179,6 @@ async function createJinaEmbeddings(
   return allEmbeddings;
 }
 
-/**
- * Generate embeddings for multiple document chunks.
- *
- * Documents use the retrieval.passage task.
- *
- * IMPORTANT:
- * The entire indexing operation uses Jina.
- * We never mix embedding providers inside
- * the same indexing operation.
- */
 export async function createEmbeddings(
   texts: string[]
 ): Promise<number[][]> {
@@ -189,13 +188,6 @@ export async function createEmbeddings(
   );
 }
 
-/**
- * Generate an embedding for a search query.
- *
- * Queries use retrieval.query so that the
- * embedding model optimizes the vector for
- * document retrieval.
- */
 export async function createEmbedding(
   text: string
 ): Promise<number[]> {
@@ -220,3 +212,4 @@ export async function createEmbedding(
 
   return embedding;
 }
+

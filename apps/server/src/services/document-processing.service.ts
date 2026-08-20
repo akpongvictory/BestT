@@ -1,15 +1,46 @@
-import fs from "fs/promises";
-import path from "path";
 import { randomUUID } from "crypto";
 
 import { PDFParse } from "pdf-parse";
+
 import {
   createEmbeddings as generateEmbeddings,
 } from "@bestt/ai";
 
 import prisma from "../lib/prisma";
 
+import {
+  downloadDocumentFile,
+} from "./storage.service";
+
+import {
+  extractWebPage,
+} from "./webpage.service";
+
+import {
+  extractYouTubeContent,
+} from "./youtube.service";
+
 const CHUNK_SIZE = 1500;
+
+function splitOversizedText(text: string): string[] {
+  const pieces: string[] = [];
+
+  for (
+    let start = 0;
+    start < text.length;
+    start += CHUNK_SIZE
+  ) {
+    const piece = text
+      .slice(start, start + CHUNK_SIZE)
+      .trim();
+
+    if (piece) {
+      pieces.push(piece);
+    }
+  }
+
+  return pieces;
+}
 
 function createChunks(text: string): string[] {
   const normalizedText = text
@@ -28,48 +59,42 @@ function createChunks(text: string): string[] {
     .filter(Boolean);
 
   const chunks: string[] = [];
+
   let currentChunk = "";
 
   for (const paragraph of paragraphs) {
+    // Paragraph itself is too large on its own —
+    // split it directly instead of parking it in
+    // currentChunk unchecked.
+    if (paragraph.length > CHUNK_SIZE) {
+      if (currentChunk) {
+        chunks.push(currentChunk);
+        currentChunk = "";
+      }
+
+      chunks.push(...splitOversizedText(paragraph));
+      continue;
+    }
+
     if (!currentChunk) {
       currentChunk = paragraph;
       continue;
     }
 
     const combinedLength =
-      currentChunk.length + 2 + paragraph.length;
+      currentChunk.length +
+      2 +
+      paragraph.length;
 
     if (combinedLength <= CHUNK_SIZE) {
-      currentChunk = `${currentChunk}\n\n${paragraph}`;
+      currentChunk =
+        `${currentChunk}\n\n${paragraph}`;
+
       continue;
     }
 
     chunks.push(currentChunk);
-
-    if (paragraph.length <= CHUNK_SIZE) {
-      currentChunk = paragraph;
-      continue;
-    }
-
-    for (
-      let start = 0;
-      start < paragraph.length;
-      start += CHUNK_SIZE
-    ) {
-      const piece = paragraph
-        .slice(start, start + CHUNK_SIZE)
-        .trim();
-
-      if (!piece) {
-        continue;
-      }
-
-      if (piece.length === CHUNK_SIZE) {
-        chunks.push(piece);
-      } else {
-        currentChunk = piece;
-      }
-    }
+    currentChunk = paragraph;
   }
 
   if (currentChunk) {
@@ -79,13 +104,6 @@ function createChunks(text: string): string[] {
   return chunks;
 }
 
-/**
- * Generates embeddings for all document chunks.
- *
- * The actual embedding implementation is provided by
- * @bestt/ai. This wrapper avoids maintaining another
- * batching/concurrency implementation in this service.
- */
 async function createEmbeddings(
   chunks: string[]
 ): Promise<number[][]> {
@@ -106,20 +124,9 @@ async function createEmbeddings(
     );
   }
 
-  console.log(
-    `Generated ${embeddings.length} embeddings.`
-  );
-
   return embeddings;
 }
 
-/**
- * Stores a document chunk and its pgvector embedding.
- *
- * Prisma does not currently expose pgvector as a normal
- * scalar type, so the vector itself is written using
- * parameterized raw SQL.
- */
 async function saveChunkWithEmbedding(
   documentId: string,
   content: string,
@@ -134,7 +141,8 @@ async function saveChunkWithEmbedding(
 
   const id = randomUUID();
 
-  const vector = `[${embedding.join(",")}]`;
+  const vector =
+    `[${embedding.join(",")}]`;
 
   await prisma.$executeRaw`
     INSERT INTO "DocumentChunk"
@@ -158,17 +166,127 @@ async function saveChunkWithEmbedding(
   `;
 }
 
+/**
+ * Extract text depending on the source type.
+ */
+async function extractDocumentText(
+  document: {
+    id: string;
+    type: "FILE" | "WEBPAGE" | "YOUTUBE";
+    fileUrl: string | null;
+    sourceUrl: string | null;
+  }
+): Promise<string> {
+  // -----------------------------
+  // PDF FILE
+  // -----------------------------
+
+  if (document.type === "FILE") {
+    if (!document.fileUrl) {
+      throw new Error(
+        "Document file is missing."
+      );
+    }
+
+    const fileBuffer =
+      await downloadDocumentFile(
+        document.fileUrl
+      );
+
+    const parser = new PDFParse({
+      data: fileBuffer,
+    });
+
+    try {
+      const result =
+        await parser.getText();
+
+      return result.text;
+    } finally {
+      await parser.destroy();
+    }
+  }
+
+  // -----------------------------
+  // WEBPAGE
+  // -----------------------------
+
+  if (document.type === "WEBPAGE") {
+    if (!document.sourceUrl) {
+      throw new Error(
+        "Webpage URL is missing."
+      );
+    }
+
+    const webpage =
+      await extractWebPage(
+        document.sourceUrl
+      );
+
+    return webpage.content;
+  }
+
+  // -----------------------------
+  // YOUTUBE
+  // -----------------------------
+
+  if (document.type === "YOUTUBE") {
+    if (!document.sourceUrl) {
+      throw new Error(
+        "YouTube URL is missing."
+      );
+    }
+
+    const parsed =
+      new URL(document.sourceUrl);
+
+    let videoId = "";
+
+    if (
+      parsed.hostname === "youtu.be"
+    ) {
+      videoId =
+        parsed.pathname.slice(1);
+    } else {
+      videoId =
+        parsed.searchParams.get("v") ??
+        parsed.pathname.split("/").pop() ??
+        "";
+    }
+
+    if (!videoId) {
+      throw new Error(
+        "Could not determine YouTube video ID."
+      );
+    }
+
+    const youtube =
+      await extractYouTubeContent(
+        videoId
+      );
+
+    return youtube.content;
+  }
+
+  throw new Error(
+    `Unsupported document type: ${document.type}`
+  );
+}
+
 export async function processDocument(
   documentId: string
 ): Promise<void> {
-  const document = await prisma.document.findUnique({
-    where: {
-      id: documentId,
-    },
-  });
+  const document =
+    await prisma.document.findUnique({
+      where: {
+        id: documentId,
+      },
+    });
 
   if (!document) {
-    throw new Error("Document not found.");
+    throw new Error(
+      "Document not found."
+    );
   }
 
   await prisma.document.update({
@@ -181,102 +299,80 @@ export async function processDocument(
   });
 
   try {
-    const filename = path.basename(document.fileUrl);
+    const text =
+      await extractDocumentText({
+        id: document.id,
+        type: document.type,
+        fileUrl: document.fileUrl,
+        sourceUrl: document.sourceUrl,
+      });
 
-    const filePath = path.resolve(
-      "src/uploads",
-      filename
+    const chunks =
+      createChunks(text);
+
+    if (chunks.length === 0) {
+      throw new Error(
+        "No readable text was extracted from the source."
+      );
+    }
+
+    console.log(
+      `Document ${document.id}: ${chunks.length} chunks created.`
     );
 
-    const fileBuffer = await fs.readFile(filePath);
-
-    const parser = new PDFParse({
-      data: fileBuffer,
+    await prisma.documentChunk.deleteMany({
+      where: {
+        documentId: document.id,
+      },
     });
 
-    try {
-      const result = await parser.getText();
+    const embeddings =
+      await createEmbeddings(chunks);
 
-      const chunks = createChunks(result.text);
-
-      if (chunks.length === 0) {
-        throw new Error(
-          "No readable text was extracted from the document."
-        );
-      }
-
-      console.log(
-        `Document ${document.id}: ${chunks.length} chunks created.`
+    if (
+      embeddings.length !==
+      chunks.length
+    ) {
+      throw new Error(
+        "Embedding count does not match chunk count."
       );
-
-      /*
-       * Remove previous chunks so re-processing a document
-       * never creates duplicate embeddings.
-       */
-      await prisma.documentChunk.deleteMany({
-        where: {
-          documentId: document.id,
-        },
-      });
-
-      /*
-       * Generate embeddings for all document chunks.
-       */
-      const embeddings =
-        await createEmbeddings(chunks);
-
-      console.log(
-        `Document ${document.id}: embeddings generated.`
-      );
-
-      /*
-       * Make sure every chunk has a corresponding embedding.
-       */
-      if (embeddings.length !== chunks.length) {
-        throw new Error(
-          "The number of generated embeddings does not match the number of document chunks."
-        );
-      }
-
-      /*
-       * Store chunks together with their vectors.
-       */
-      for (
-        let index = 0;
-        index < chunks.length;
-        index++
-      ) {
-        const embedding = embeddings[index];
-
-        if (!embedding?.length) {
-          throw new Error(
-            `Failed to generate embedding for chunk ${index}.`
-          );
-        }
-
-        await saveChunkWithEmbedding(
-          document.id,
-          chunks[index],
-          index,
-          embedding
-        );
-      }
-
-      console.log(
-        `Document ${document.id}: chunks stored in pgvector.`
-      );
-
-      await prisma.document.update({
-        where: {
-          id: document.id,
-        },
-        data: {
-          processingStatus: "COMPLETED",
-        },
-      });
-    } finally {
-      await parser.destroy();
     }
+
+    for (
+      let index = 0;
+      index < chunks.length;
+      index++
+    ) {
+      const embedding =
+        embeddings[index];
+
+      if (!embedding?.length) {
+        throw new Error(
+          `Failed to generate embedding for chunk ${index}.`
+        );
+      }
+
+      await saveChunkWithEmbedding(
+        document.id,
+        chunks[index],
+        index,
+        embedding
+      );
+    }
+
+    await prisma.document.update({
+      where: {
+        id: document.id,
+      },
+      data: {
+        processingStatus:
+          "COMPLETED",
+      },
+    });
+
+    console.log(
+      `Document ${document.id}: processing completed.`
+    );
   } catch (error) {
     await prisma.document.update({
       where: {

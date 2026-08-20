@@ -16,15 +16,14 @@ import {
 import DashboardLayout from "../layouts/DashboardLayout";
 import { useCourse } from "../hooks/useCourse";
 
-import {
-  CourseHeader,
-  DocumentList,
-} from "../features/study";
+import { CourseHeader, DocumentList } from "../features/study";
 
 import {
   UploadModal,
   useUploadDocument,
 } from "../features/documents";
+
+import { notify } from "../lib/toast";
 
 export default function Study() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -78,32 +77,45 @@ export default function Study() {
   }
 
   async function handleUpload(file: File) {
-  if (!courseId) {
-    alert("Invalid course.");
-    return;
+    if (!courseId) {
+      notify.error(
+        "Invalid course",
+        "This course could not be found."
+      );
+      return;
+    }
+
+    try {
+      await uploadMutation.mutateAsync({
+        courseId,
+        file,
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["course", courseId],
+      });
+
+      notify.success(
+        "Material added",
+        `${file.name} was uploaded successfully.`
+      );
+
+      setOpenUpload(false);
+    } catch (err: unknown) {
+      console.error("Upload failed:", err);
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while uploading. Please try again.";
+
+      notify.error("Upload failed", message);
+    }
   }
-
-  try {
-    await uploadMutation.mutateAsync({
-      courseId,
-      file,
-    });
-
-    await queryClient.invalidateQueries({
-      queryKey: ["course", courseId],
-    });
-
-    setOpenUpload(false);
-  } catch (err) {
-    console.error("Upload failed:", err);
-    alert("Upload failed.");
-  }
-}
 
   return (
     <DashboardLayout>
       <div className="space-y-10">
-
         {/* Back to dashboard */}
         <button
           type="button"
@@ -143,7 +155,8 @@ export default function Study() {
             <button
               type="button"
               onClick={() => setOpenUpload(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d1b3e] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#0d1b3e]/10 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#172b58]"
+              disabled={uploadMutation.isPending}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d1b3e] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#0d1b3e]/10 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#172b58] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
             >
               <Plus size={17} />
               Add material
@@ -173,7 +186,8 @@ export default function Study() {
                 <button
                   type="button"
                   onClick={() => setOpenUpload(true)}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700"
+                  disabled={uploadMutation.isPending}
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Plus size={17} />
                   Add your first material
@@ -184,7 +198,6 @@ export default function Study() {
 
           {/* Source types */}
           <div className="grid gap-3 sm:grid-cols-3">
-
             {/* Documents */}
             <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
@@ -235,7 +248,6 @@ export default function Study() {
                 </p>
               </div>
             </div>
-
           </div>
         </section>
 
@@ -260,7 +272,6 @@ export default function Study() {
           </div>
 
           <div className="grid gap-5 md:grid-cols-3">
-
             {/* Chat */}
             <button
               type="button"
@@ -319,8 +330,9 @@ export default function Study() {
             <button
               type="button"
               onClick={() => {
-                alert(
-                  "Review is coming soon. For now, use Chat with BestT to review your materials."
+                notify.info(
+                  "Review is coming soon",
+                  "For now, use Chat with BestT to review your materials."
                 );
               }}
               className="group rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-purple-200 hover:shadow-xl hover:shadow-purple-100/50"
@@ -345,7 +357,6 @@ export default function Study() {
                 </span>
               </span>
             </button>
-
           </div>
         </section>
 
@@ -355,7 +366,6 @@ export default function Study() {
 
         <section className="overflow-hidden rounded-3xl bg-[#0d1b3e] p-6 text-white shadow-xl shadow-[#0d1b3e]/10 sm:p-8">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-
             <div className="max-w-xl">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
                 Build your knowledge base
@@ -374,22 +384,26 @@ export default function Study() {
             <button
               type="button"
               onClick={() => setOpenUpload(true)}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-[#0d1b3e] transition-all hover:-translate-y-0.5 hover:bg-blue-50"
+              disabled={uploadMutation.isPending}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-[#0d1b3e] transition-all hover:-translate-y-0.5 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
             >
               <Upload size={17} />
               Add material
             </button>
-
           </div>
         </section>
 
         {/* Upload modal */}
         <UploadModal
           open={openUpload}
-          onClose={() => setOpenUpload(false)}
+          onClose={() => {
+            if (!uploadMutation.isPending) {
+              setOpenUpload(false);
+            }
+          }}
           onUpload={handleUpload}
+          isUploading={uploadMutation.isPending}
         />
-
       </div>
     </DashboardLayout>
   );

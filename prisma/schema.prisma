@@ -61,6 +61,13 @@ model Course {
 // ===============================
 // DOCUMENTS
 // ===============================
+
+enum DocumentType {
+  FILE
+  WEBPAGE
+  YOUTUBE
+}
+
 enum DocumentStatus {
   PENDING
   PROCESSING
@@ -71,12 +78,20 @@ enum DocumentStatus {
 model Document {
   id String @id @default(uuid())
 
-  filename     String
+  filename     String?
   originalName String
-  fileUrl      String
-  fileType     String
-  fileSize     Int?
-  fileHash     String?
+
+  fileUrl   String?
+  sourceUrl String?
+
+  fileType String?
+  fileSize Int?
+  fileHash String?
+
+  type DocumentType @default(FILE)
+
+  title       String?
+  description String?
 
   processingStatus DocumentStatus @default(PENDING)
 
@@ -91,8 +106,9 @@ model Document {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([courseId, userId, fileHash])
-@@index([courseId, processingStatus])
+  @@index([courseId, processingStatus])
+  @@index([courseId, type])
+  @@index([userId, sourceUrl])
 }
 
 // ===============================
@@ -126,10 +142,10 @@ model ChatSession {
 
   title String?
 
-  userId String
+  userId   String
   courseId String
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   messages ChatMessage[]

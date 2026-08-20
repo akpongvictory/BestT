@@ -1,12 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import { env } from "./config/env";
-import path from "path";
 import healthRouter from './routes/health';
 import authRouter from './routes/auth';
 import courseRouter from "./routes/courses";
 import documentRouter from "./routes/documents";
 import chatRouter from "./routes/chat";
+import quizRouter from "./routes/quiz";
 // Load environment variables
 
 const PORT = env.port;
@@ -26,15 +26,13 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(
-  "/uploads",
-  express.static(path.resolve("src/uploads"))
-);
+
 // Routes
 app.use('/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/courses', courseRouter);
 app.use('/api/documents', documentRouter);
+app.use('/api/quiz', quizRouter);
 
 // Debugging middleware to log incoming requests
 app.use((req, _res, next) => {

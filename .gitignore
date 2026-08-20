@@ -26,3 +26,7 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 scripts/test-tutor.ps1
+# Local uploaded documents
+apps/server/src/uploads/*
+apps/server/src/uploads/*
+!apps/server/src/uploads/.gitkeep

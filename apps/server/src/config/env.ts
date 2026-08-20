@@ -40,6 +40,11 @@ huggingfaceModel:
     process.env.OPENAI_MODEL ??
     "gpt-4o-mini",
 
+      // YouTube
+  youtubeApiKey:
+    process.env.YOUTUBE_API_KEY,
+
+
   // OpenRouter
   openrouterApiKey:
     process.env.OPENROUTER_API_KEY,
@@ -63,6 +68,19 @@ huggingfaceModel:
   jinaEmbeddingModel:
     process.env.JINA_EMBEDDING_MODEL ??
     "jina-embeddings-v5-text-nano",
+
+    // Supabase Storage
+supabaseUrl:
+  process.env.SUPABASE_URL,
+
+supabaseServiceRoleKey:
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+
+supabaseStorageBucket:
+  process.env.SUPABASE_STORAGE_BUCKET ??
+  "bestt-documents",
+
+
 
   // Server
   port:
@@ -124,6 +142,21 @@ console.log(
 console.log(
   "Hugging Face model:",
   env.huggingfaceModel
+);
+
+console.log(
+  "Supabase URL configured:",
+  Boolean(env.supabaseUrl)
+);
+
+console.log(
+  "Supabase service role key configured:",
+  Boolean(env.supabaseServiceRoleKey)
+);
+
+console.log(
+  "Supabase storage bucket:",
+  env.supabaseStorageBucket
 );
 
 console.log("=======================");

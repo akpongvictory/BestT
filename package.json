@@ -31,8 +31,10 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^3.0.3",
+    "cheerio": "^1.2.0",
     "groq-sdk": "^1.5.0",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "youtube-transcript-ts": "^2.0.0"
   },
   "allowScripts": {
     "esbuild@0.21.5": true,

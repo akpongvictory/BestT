@@ -1,9 +1,11 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, type NavLinkRenderProps } from "react-router-dom";
 import {
+  FileText,
   LayoutDashboard,
-  BookOpen,
-  Upload,
+  Settings,
   Sparkles,
+  Upload,
+  UserRound,
 } from "lucide-react";
 
 const links = [
@@ -13,14 +15,24 @@ const links = [
     icon: LayoutDashboard,
   },
   {
-    name: "My Learning",
-    path: "/dashboard",
-    icon: BookOpen,
+    name: "Resources",
+    path: "/resources",
+    icon: FileText,
   },
   {
     name: "Upload Material",
     path: "/upload",
     icon: Upload,
+  },
+  {
+    name: "Profile",
+    path: "/profile",
+    icon: UserRound,
+  },
+  {
+    name: "Settings",
+    path: "/settings",
+    icon: Settings,
   },
 ];
 
@@ -31,8 +43,8 @@ export default function Sidebar() {
       <div className="flex h-20 items-center border-b border-slate-100 px-5">
         <img
           src="/bestt-logo.png"
-          alt="BestT AI Tutor"
-          className="h-14 w-auto object-contain"
+          alt="BestT"
+          className="h-11 w-auto object-contain"
         />
       </div>
 
@@ -50,17 +62,9 @@ export default function Sidebar() {
               <NavLink
                 key={link.name}
                 to={link.path}
-              className={({ isActive }: { isActive: boolean }) =>
-                  [
-                    "group flex items-center gap-3 rounded-xl px-3.5 py-3",
-                    "text-sm font-medium transition-all duration-200",
-                    isActive
-                      ? "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-sm"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                  ].join(" ")
-                }
+                className="group flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium transition-all duration-200"
               >
-               {({ isActive }: { isActive: boolean }) => (
+                {({ isActive }: NavLinkRenderProps) => (
                   <>
                     <span
                       className={[
@@ -73,7 +77,15 @@ export default function Sidebar() {
                       <Icon size={18} strokeWidth={1.9} />
                     </span>
 
-                    <span>{link.name}</span>
+                    <span
+                      className={
+                        isActive
+                          ? "text-blue-700"
+                          : "text-slate-600 group-hover:text-slate-900"
+                      }
+                    >
+                      {link.name}
+                    </span>
                   </>
                 )}
               </NavLink>
@@ -85,7 +97,6 @@ export default function Sidebar() {
       {/* Tutor card */}
       <div className="m-4 rounded-2xl bg-[#0d1b3e] p-4 text-white shadow-lg shadow-slate-200">
         <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/10">
-          <Sparkles size={18} className="text-cyan-300" />
         </div>
 
         <p className="text-sm font-semibold">BestT Tutor</p>

@@ -1,9 +1,12 @@
 import fs from "fs/promises";
-import path from "path";
 import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 
 import prisma from "../lib/prisma";
+import {
+  uploadDocumentFile,
+  deleteDocumentFile,
+} from "./storage.service";
 
 async function calculateFileHash(
   filePath: string
@@ -26,6 +29,19 @@ function createDuplicateDocumentError() {
   return error;
 }
 
+function createStoragePath(
+  courseId: string,
+  documentId: string,
+  originalName: string
+) {
+  const extension =
+    originalName.toLowerCase().endsWith(".pdf")
+      ? ".pdf"
+      : "";
+
+  return `documents/${courseId}/${documentId}${extension}`;
+}
+
 export async function createDocument({
   file,
   courseId,
@@ -37,112 +53,177 @@ export async function createDocument({
 }) {
   const filePath = file.path;
 
-  const fileHash = await calculateFileHash(filePath);
-
-  // Fast path: avoid an unnecessary database insert for
-  // documents that are already known to exist.
-const existingDocument =
-  await prisma.document.findFirst({
-    where: {
-      courseId,
-      userId,
-      fileHash,
-    },
-  });
-
-if (existingDocument) {
-  /*
-   * A previously failed document can be retried.
-   *
-   * Replace its stored file with the newly uploaded file
-   * and reset processing back to PENDING.
-   */
-  if (
-    existingDocument.processingStatus ===
-    "FAILED"
-  ) {
-    try {
-      const oldFilename = path.basename(
-        existingDocument.fileUrl
-      );
-
-      const oldFilePath = path.resolve(
-        "src/uploads",
-        oldFilename
-      );
-
-      await fs.unlink(oldFilePath);
-    } catch (error) {
-      console.warn(
-        "Could not remove old failed document file:",
-        error
-      );
-    }
-
-    return await prisma.document.update({
-      where: {
-        id: existingDocument.id,
-      },
-      data: {
-        filename: file.originalname,
-        originalName: file.originalname,
-        fileUrl: `/uploads/${file.filename}`,
-        fileType: file.mimetype,
-        fileSize: file.size,
-        fileHash,
-        processingStatus: "PENDING",
-      },
-    });
-  }
-
-  /*
-   * Completed or currently-processing documents are
-   * genuine duplicates.
-   */
   try {
-    await fs.unlink(filePath);
-  } catch (error) {
-    console.warn(
-      "Could not remove duplicate uploaded file:",
-      error
-    );
-  }
+    const fileHash =
+      await calculateFileHash(filePath);
 
-  throw createDuplicateDocumentError();
-}
+    /*
+     * Check whether this exact document already
+     * exists in this course.
+     */
+    const existingDocument =
+      await prisma.document.findFirst({
+        where: {
+          courseId,
+          userId,
+          fileHash,
+        },
+      });
 
-  try {
-    return await prisma.document.create({
-      data: {
-        filename: file.originalname,
-        originalName: file.originalname,
-        fileUrl: `/uploads/${file.filename}`,
-        fileType: file.mimetype,
-        fileSize: file.size,
-        fileHash,
-        courseId,
-        userId,
-      },
-    });
-  } catch (error) {
-    // The unique database constraint protects against two
-    // identical uploads arriving at exactly the same time.
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      try {
+    if (existingDocument) {
+      /*
+       * Failed documents can be retried.
+       */
+      if (
+        existingDocument.processingStatus ===
+        "FAILED"
+      ) {
+        const storagePath =
+          createStoragePath(
+            courseId,
+            existingDocument.id,
+            file.originalname
+          );
+
+        /*
+         * Upload replacement file.
+         */
+        await uploadDocumentFile({
+          filePath,
+          storagePath,
+          contentType: file.mimetype,
+        });
+
+        /*
+         * Remove temporary local file.
+         */
         await fs.unlink(filePath);
-      } catch (unlinkError) {
-        console.warn(
-          "Could not remove duplicate uploaded file:",
-          unlinkError
-        );
+
+        return await prisma.document.update({
+          where: {
+            id: existingDocument.id,
+          },
+
+          data: {
+            filename: file.originalname,
+            originalName: file.originalname,
+            fileUrl: storagePath,
+            fileType: file.mimetype,
+            fileSize: file.size,
+            fileHash,
+            processingStatus: "PENDING",
+          },
+        });
       }
+
+      /*
+       * Completed or currently-processing
+       * documents are genuine duplicates.
+       */
+      await fs.unlink(filePath);
 
       throw createDuplicateDocumentError();
     }
 
+    /*
+     * Create database record first so we get
+     * a stable document ID for the storage path.
+     */
+    const document =
+      await prisma.document.create({
+        data: {
+          filename: file.originalname,
+          originalName: file.originalname,
+
+          /*
+           * Temporary placeholder.
+           * We update this immediately after creation.
+           */
+          fileUrl: "",
+
+          fileType: file.mimetype,
+          fileSize: file.size,
+          fileHash,
+          courseId,
+          userId,
+          processingStatus: "PENDING",
+        },
+      });
+
+    const storagePath =
+      createStoragePath(
+        courseId,
+        document.id,
+        file.originalname
+      );
+
+    try {
+      /*
+       * Upload the actual PDF to Supabase Storage.
+       */
+      await uploadDocumentFile({
+        filePath,
+        storagePath,
+        contentType: file.mimetype,
+      });
+
+      /*
+       * Store the storage path in PostgreSQL.
+       */
+      const updatedDocument =
+        await prisma.document.update({
+          where: {
+            id: document.id,
+          },
+
+          data: {
+            fileUrl: storagePath,
+          },
+        });
+
+      /*
+       * Remove the temporary local file.
+       */
+      await fs.unlink(filePath);
+
+      return updatedDocument;
+    } catch (error) {
+      /*
+       * If storage upload fails, don't leave
+       * an orphaned database record behind.
+       */
+      await prisma.document.delete({
+        where: {
+          id: document.id,
+        },
+      });
+
+      throw error;
+    }
+  } catch (error) {
+    /*
+     * Make a best effort to remove the temporary
+     * Multer file.
+     */
+    try {
+      await fs.unlink(filePath);
+    } catch {
+      // File may already have been removed.
+    }
+
+    /*
+     * Preserve duplicate-document errors.
+     */
+    if (
+      error instanceof Error &&
+      error.name === "DuplicateDocumentError"
+    ) {
+      throw error;
+    }
+
+    /*
+     * Preserve Prisma errors and other failures.
+     */
     throw error;
   }
 }
@@ -151,37 +232,49 @@ export async function deleteDocument(
   documentId: string,
   userId: string
 ) {
-  const document = await prisma.document.findFirst({
-    where: {
-      id: documentId,
-      userId,
-    },
-  });
+  const document =
+    await prisma.document.findFirst({
+      where: {
+        id: documentId,
+        userId,
+      },
+    });
 
   if (!document) {
     return null;
   }
 
+  /*
+   * Delete database record first.
+   *
+   * The Prisma relation cascade will remove
+   * associated chunks.
+   */
   await prisma.document.delete({
     where: {
       id: document.id,
     },
   });
 
-  try {
-    const filename = path.basename(document.fileUrl);
-
-    const filePath = path.resolve(
-      "src/uploads",
-      filename
-    );
-
-    await fs.unlink(filePath);
-  } catch (error) {
-    console.warn(
-      "Could not delete physical file:",
-      error
-    );
+  /*
+   * Then remove the PDF from Supabase Storage.
+   */
+  if (document.fileUrl) {
+    try {
+      await deleteDocumentFile(
+        document.fileUrl
+      );
+    } catch (error) {
+      /*
+       * The database deletion has already succeeded.
+       * Log the storage failure rather than making the
+       * user think the document still exists.
+       */
+      console.warn(
+        "Could not delete document from storage:",
+        error
+      );
+    }
   }
 
   return document;

@@ -1,0 +1,980 @@
+========================================
+FILE: .\apps\client\src\routes\AppRoutes.tsx
+========================================
+
+import { Navigate, Route, Routes } from "react-router-dom";
+
+import Landing from "../pages/Landing";
+import Login from "../pages/Login";
+import Register from "../pages/Register";
+import Dashboard from "../pages/Dashboard";
+import Resources from "../pages/Resources";
+import Profile from "../pages/Profile";
+import Settings from "../pages/Settings";
+import Upload from "../pages/Upload";
+
+import ProtectedRoute from "./ProtectedRoute";
+
+export default function AppRoutes() {
+  return (
+    <Routes>
+      {/* Public routes */}
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+
+      {/* Protected application routes */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/resources" element={<Resources />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/upload" element={<Upload />} />
+      </Route>
+
+      {/* Unknown routes */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+========================================
+FILE: .\apps\client\src\routes\ProtectedRoute.tsx
+========================================
+
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+
+export default function ProtectedRoute() {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location }}
+      />
+    );
+  }
+
+  return <Outlet />;
+}
+
+========================================
+FILE: .\apps\client\src\components\CourseCard.tsx
+========================================
+
+import {
+  ArrowUpRight,
+  BookOpen,
+  FileText,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+import { Course } from "../services/courses";
+
+export default function CourseCard({
+  course,
+}: {
+  course: Course;
+}) {
+  const navigate = useNavigate();
+
+  const documentCount = course._count?.documents ?? 0;
+
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(`/study/${course.id}`)}
+      className="group relative w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-slate-200/70 focus:outline-none focus:ring-4 focus:ring-blue-100"
+    >
+      {/* Subtle hover accent */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition-all duration-300 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-blue-600/20">
+          <BookOpen size={20} strokeWidth={1.8} />
+        </div>
+
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition-all duration-300 group-hover:bg-blue-50 group-hover:text-blue-600">
+          <ArrowUpRight
+            size={18}
+            strokeWidth={1.8}
+            className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+          />
+        </span>
+      </div>
+
+      {/* Course information */}
+      <div className="mt-5">
+        <h2 className="line-clamp-1 text-lg font-semibold tracking-tight text-[#0d1b3e]">
+          {course.title}
+        </h2>
+
+        <p className="mt-2 line-clamp-2 min-h-[40px] text-sm leading-5 text-slate-500">
+          {course.description || "Build your knowledge with BestT."}
+        </p>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+        <span className="flex items-center gap-2 text-xs font-medium text-slate-500">
+          <FileText
+            size={14}
+            strokeWidth={1.8}
+            className="text-slate-400"
+          />
+
+          {documentCount}{" "}
+          {documentCount === 1 ? "document" : "documents"}
+        </span>
+
+        <span className="flex items-center gap-1 text-xs font-semibold text-blue-600 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100">
+          Open course
+          <ArrowUpRight size={13} strokeWidth={2} />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+========================================
+FILE: .\apps\client\src\pages\Dashboard.tsx
+========================================
+
+import {
+  ArrowRight,
+  BookOpen,
+  Plus,
+} from "lucide-react";
+import { useState } from "react";
+
+import DashboardLayout from "../layouts/DashboardLayout";
+import CourseCard from "../components/CourseCard";
+import CreateCourseModal from "../components/CreateCourseModal";
+
+import { useCourses } from "../hooks/useCourse";
+import { Course } from "../services/courses";
+
+export default function Dashboard() {
+  const [open, setOpen] = useState(false);
+
+  const {
+    data: courses = [],
+    isLoading,
+    error,
+  } = useCourses();
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-10">
+        {/* Hero */}
+        <section className="relative overflow-hidden rounded-[32px] bg-[#0d1b3e] shadow-2xl shadow-[#0d1b3e]/10">
+          {/* Background atmosphere */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(59,130,246,0.22),transparent_30%),radial-gradient(circle_at_70%_100%,rgba(139,92,246,0.18),transparent_32%)]" />
+
+          <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full border border-white/5" />
+          <div className="absolute -right-8 -top-12 h-52 w-52 rounded-full border border-white/5" />
+
+          <div className="relative px-6 py-9 sm:px-9 sm:py-11 lg:px-12 lg:py-12">
+            <div className="max-w-3xl">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-3.5 py-2 text-[11px] font-semibold tracking-wide text-blue-100">
+                <span
+                  aria-hidden="true"
+                  className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-400/15"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
+                </span>
+
+                YOUR INTELLIGENT LEARNING SPACE
+              </div>
+
+              <h1 className="text-3xl font-semibold leading-tight tracking-[-0.03em] text-white sm:text-4xl lg:text-[42px]">
+                Learn with clarity.
+                <span className="block bg-gradient-to-r from-cyan-300 via-blue-300 to-purple-300 bg-clip-text text-transparent">
+                  Achieve more with BestT.
+                </span>
+              </h1>
+
+              <p className="mt-5 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">
+                Bring your course materials together, ask better
+                questions and turn difficult topics into genuine
+                understanding.
+              </p>
+
+              <div className="mt-7 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => setOpen(true)}
+                  className="group inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-[#0d1b3e] shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-xl"
+                >
+                  <Plus size={17} strokeWidth={2} />
+
+                  Create a course
+
+                  <ArrowRight
+                    size={15}
+                    strokeWidth={2}
+                    className="transition-transform duration-200 group-hover:translate-x-0.5"
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Courses */}
+        <section>
+          <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <div className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="h-1.5 w-1.5 rounded-full bg-blue-600"
+                />
+
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600">
+                  Your workspace
+                </p>
+              </div>
+
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#0d1b3e]">
+                My Courses
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Pick up where you left off or begin something new.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:shadow-md"
+            >
+              <Plus size={17} strokeWidth={2} />
+              New course
+            </button>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div
+              role="alert"
+              className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700"
+            >
+              <p className="font-semibold">
+                We couldn't load your courses.
+              </p>
+
+              <p className="mt-1 text-red-600">
+                Please refresh the page and try again.
+              </p>
+            </div>
+          )}
+
+          {/* Loading */}
+          {isLoading && (
+            <div
+              className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
+              aria-label="Loading courses"
+            >
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="h-56 animate-pulse rounded-3xl border border-slate-200 bg-white shadow-sm"
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Empty */}
+          {!isLoading && !error && courses.length === 0 && (
+            <div className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+              <div
+                aria-hidden="true"
+                className="absolute left-1/2 top-0 h-32 w-64 -translate-x-1/2 rounded-full bg-blue-100/50 blur-3xl"
+              />
+
+              <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-sm">
+                <BookOpen size={27} strokeWidth={1.7} />
+              </div>
+
+              <h3 className="relative mt-6 text-lg font-semibold text-[#0d1b3e]">
+                Your learning space is waiting
+              </h3>
+
+              <p className="relative mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                Create a course and bring your notes, PDFs or other
+                learning material into BestT.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="relative mt-7 inline-flex items-center gap-2 rounded-xl bg-[#0d1b3e] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#0d1b3e]/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#142650] hover:shadow-xl"
+              >
+                <Plus size={17} strokeWidth={2} />
+                Create your first course
+              </button>
+            </div>
+          )}
+
+          {/* Courses */}
+          {!isLoading && !error && courses.length > 0 && (
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {courses.map((course: Course) => (
+                <CourseCard
+                  key={course.id}
+                  course={course}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <CreateCourseModal
+        open={open}
+        onClose={() => setOpen(false)}
+      />
+    </DashboardLayout>
+  );
+}
+
+========================================
+FILE: .\apps\client\src\pages\Study.tsx
+========================================
+
+import { useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  BookOpen,
+  FileText,
+  Globe,
+  Link as LinkIcon,
+  MessageCircle,
+  PlayCircle,
+  Plus,
+  Upload,
+} from "lucide-react";
+
+import DashboardLayout from "../layouts/DashboardLayout";
+import { useCourse } from "../hooks/useCourse";
+
+import { CourseHeader, DocumentList } from "../features/study";
+
+import {
+  UploadModal,
+  useUploadDocument,
+} from "../features/documents";
+
+import { notify } from "../lib/toast";
+
+export default function Study() {
+  const { courseId } = useParams<{ courseId: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const [openUpload, setOpenUpload] = useState(false);
+
+  const {
+    data: course,
+    isLoading,
+    error,
+  } = useCourse(courseId ?? "");
+
+  const uploadMutation = useUploadDocument();
+
+  if (!courseId) {
+    return (
+      <DashboardLayout>
+        <div className="rounded-2xl border border-red-100 bg-red-50 p-6">
+          <p className="text-sm font-medium text-red-700">
+            Invalid course.
+          </p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="h-8 w-64 animate-pulse rounded-lg bg-slate-200" />
+          <div className="h-5 w-96 max-w-full animate-pulse rounded bg-slate-200" />
+          <div className="h-56 animate-pulse rounded-3xl bg-white shadow-sm" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error || !course) {
+    return (
+      <DashboardLayout>
+        <div className="rounded-2xl border border-red-100 bg-red-50 p-6">
+          <p className="text-sm font-medium text-red-700">
+            Failed to load course.
+          </p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  async function handleUpload(file: File) {
+    if (!courseId) {
+      notify.error(
+        "Invalid course",
+        "This course could not be found."
+      );
+      return;
+    }
+
+    try {
+      await uploadMutation.mutateAsync({
+        courseId,
+        file,
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["course", courseId],
+      });
+
+      notify.success(
+        "Material added",
+        `${file.name} was uploaded successfully.`
+      );
+
+      setOpenUpload(false);
+    } catch (err: unknown) {
+      console.error("Upload failed:", err);
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while uploading. Please try again.";
+
+      notify.error("Upload failed", message);
+    }
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-10">
+        {/* Back to dashboard */}
+        <button
+          type="button"
+          onClick={() => navigate("/dashboard")}
+          className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-[#0d1b3e]"
+        >
+          <ArrowLeft size={16} />
+          Back to dashboard
+        </button>
+
+        {/* Course header */}
+        <CourseHeader
+          title={course.title}
+          description={course.description ?? undefined}
+        />
+
+        {/* ===================================================== */}
+        {/* STUDY MATERIALS */}
+        {/* ===================================================== */}
+
+        <section className="space-y-5">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-600">
+                Your sources
+              </p>
+
+              <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[#0d1b3e]">
+                Study materials
+              </h2>
+
+              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
+                Everything BestT can use to help you learn this course.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setOpenUpload(true)}
+              disabled={uploadMutation.isPending}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d1b3e] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#0d1b3e]/10 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#172b58] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+            >
+              <Plus size={17} />
+              Add material
+            </button>
+          </div>
+
+          {/* Materials */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            {course.documents.length > 0 ? (
+              <DocumentList documents={course.documents} />
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm">
+                  <BookOpen size={25} strokeWidth={1.8} />
+                </div>
+
+                <h3 className="mt-5 text-lg font-semibold text-[#0d1b3e]">
+                  No study materials yet
+                </h3>
+
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                  Add your notes, documents, webpages, or YouTube
+                  resources. BestT will use them as the foundation
+                  for your learning experience.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setOpenUpload(true)}
+                  disabled={uploadMutation.isPending}
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Plus size={17} />
+                  Add your first material
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Source types */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            {/* Documents */}
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <FileText size={19} />
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-slate-800">
+                  Documents
+                </p>
+
+                <p className="text-xs text-slate-500">
+                  PDF, DOCX, TXT
+                </p>
+              </div>
+            </div>
+
+            {/* Web pages */}
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <Globe size={19} />
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-slate-800">
+                  Web pages
+                </p>
+
+                <p className="text-xs text-slate-500">
+                  Learn from online sources
+                </p>
+              </div>
+            </div>
+
+            {/* YouTube */}
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-500">
+                <PlayCircle size={19} />
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-slate-800">
+                  YouTube
+                </p>
+
+                <p className="text-xs text-slate-500">
+                  Learn from video content
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ===================================================== */}
+        {/* LEARNING WORKSPACE */}
+        {/* ===================================================== */}
+
+        <section className="space-y-5">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-600">
+              Learn from your materials
+            </p>
+
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[#0d1b3e]">
+              Learning workspace
+            </h2>
+
+            <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
+              Choose how you want to study. BestT will work with the
+              materials you&apos;ve added to this course.
+            </p>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-3">
+            {/* Chat */}
+            <button
+              type="button"
+              onClick={() => navigate(`/study/${courseId}/chat`)}
+              className="group rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/50"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                <MessageCircle size={22} strokeWidth={1.8} />
+              </div>
+
+              <h3 className="mt-6 text-lg font-semibold text-[#0d1b3e]">
+                Chat with BestT
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Ask questions, get explanations, and explore ideas
+                from your course materials.
+              </p>
+
+              <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-blue-600">
+                Open tutor
+                <span className="transition-transform group-hover:translate-x-1">
+                  →
+                </span>
+              </span>
+            </button>
+
+            {/* Quiz */}
+            <button
+              type="button"
+              onClick={() => navigate(`/quiz/${courseId}`)}
+              className="group rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-100/50"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
+                <BookOpen size={22} strokeWidth={1.8} />
+              </div>
+
+              <h3 className="mt-6 text-lg font-semibold text-[#0d1b3e]">
+                Practice
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Test your understanding with questions generated
+                from the material you&apos;re studying.
+              </p>
+
+              <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-indigo-600">
+                Start practice
+                <span className="transition-transform group-hover:translate-x-1">
+                  →
+                </span>
+              </span>
+            </button>
+
+            {/* Review */}
+            <button
+              type="button"
+              onClick={() => {
+                notify.info(
+                  "Review is coming soon",
+                  "For now, use Chat with BestT to review your materials."
+                );
+              }}
+              className="group rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-purple-200 hover:shadow-xl hover:shadow-purple-100/50"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 transition-colors group-hover:bg-purple-600 group-hover:text-white">
+                <LinkIcon size={22} strokeWidth={1.8} />
+              </div>
+
+              <h3 className="mt-6 text-lg font-semibold text-[#0d1b3e]">
+                Review
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Turn your course materials into concise explanations
+                and useful revision notes.
+              </p>
+
+              <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-purple-600">
+                Review material
+                <span className="transition-transform group-hover:translate-x-1">
+                  →
+                </span>
+              </span>
+            </button>
+          </div>
+        </section>
+
+        {/* ===================================================== */}
+        {/* ADD MATERIAL */}
+        {/* ===================================================== */}
+
+        <section className="overflow-hidden rounded-3xl bg-[#0d1b3e] p-6 text-white shadow-xl shadow-[#0d1b3e]/10 sm:p-8">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">
+                Build your knowledge base
+              </p>
+
+              <h2 className="mt-2 text-2xl font-semibold">
+                Add more learning material
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Bring together your notes, documents, websites, and
+                YouTube resources in one course.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setOpenUpload(true)}
+              disabled={uploadMutation.isPending}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-[#0d1b3e] transition-all hover:-translate-y-0.5 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+            >
+              <Upload size={17} />
+              Add material
+            </button>
+          </div>
+        </section>
+
+        {/* Upload modal */}
+        <UploadModal
+          open={openUpload}
+          onClose={() => {
+            if (!uploadMutation.isPending) {
+              setOpenUpload(false);
+            }
+          }}
+          onUpload={handleUpload}
+          isUploading={uploadMutation.isPending}
+        />
+      </div>
+    </DashboardLayout>
+  );
+}
+
+========================================
+FILE: .\apps\client\src\pages\Resources.tsx
+========================================
+
+import {
+  BookOpen,
+  FileText,
+  Search,
+  Upload,
+} from "lucide-react";
+import { useState } from "react";
+
+import DashboardLayout from "../layouts/DashboardLayout";
+import PageHeader from "../components/PageHeader";
+
+export default function Resources() {
+  const [search, setSearch] = useState("");
+
+  return (
+    <DashboardLayout>
+      <div>
+        <PageHeader
+          eyebrow="Library"
+          title="Resources"
+          description="Keep track of the material you're using across your BestT learning workspace."
+          action={
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d1b3e] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#142650] hover:shadow-lg"
+            >
+              <Upload size={17} />
+              Upload material
+            </button>
+          }
+        />
+
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="relative">
+            <Search
+              size={18}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search your resources..."
+              className="h-11 w-full rounded-xl bg-slate-50 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:bg-white focus:ring-4 focus:ring-blue-50"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <FileText size={20} />
+            </div>
+
+            <h2 className="mt-5 font-semibold text-[#0d1b3e]">
+              Course documents
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Documents attached to your courses will be organized here.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+              <BookOpen size={20} />
+            </div>
+
+            <h2 className="mt-5 font-semibold text-[#0d1b3e]">
+              Learning material
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Keep your study material organized and ready to explore.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 text-slate-400">
+            <FileText size={24} />
+          </div>
+
+          <h2 className="mt-5 font-semibold text-[#0d1b3e]">
+            Your resource library
+          </h2>
+
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+            Upload documents to your courses and they'll appear here as your
+            BestT library grows.
+          </p>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+}
+
+========================================
+FILE: .\apps\client\src\components\Sidebar.tsx
+========================================
+
+import { NavLink, type NavLinkRenderProps } from "react-router-dom";
+import {
+  FileText,
+  LayoutDashboard,
+  Settings,
+  Sparkles,
+  Upload,
+  UserRound,
+} from "lucide-react";
+
+const links = [
+  {
+    name: "Dashboard",
+    path: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    name: "Resources",
+    path: "/resources",
+    icon: FileText,
+  },
+  {
+    name: "Upload Material",
+    path: "/upload",
+    icon: Upload,
+  },
+  {
+    name: "Profile",
+    path: "/profile",
+    icon: UserRound,
+  },
+  {
+    name: "Settings",
+    path: "/settings",
+    icon: Settings,
+  },
+];
+
+export default function Sidebar() {
+  return (
+    <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
+      {/* Brand */}
+      <div className="flex h-20 items-center border-b border-slate-100 px-5">
+        <img
+          src="/bestt-logo.png"
+          alt="BestT"
+          className="h-11 w-auto object-contain"
+        />
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-4 py-6">
+        <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          Workspace
+        </p>
+
+        <div className="space-y-1.5">
+          {links.map((link) => {
+            const Icon = link.icon;
+
+            return (
+              <NavLink
+                key={link.name}
+                to={link.path}
+                className="group flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium transition-all duration-200"
+              >
+                {({ isActive }: NavLinkRenderProps) => (
+                  <>
+                    <span
+                      className={[
+                        "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
+                        isActive
+                          ? "bg-white text-blue-600 shadow-sm"
+                          : "bg-slate-50 text-slate-500 group-hover:text-slate-700",
+                      ].join(" ")}
+                    >
+                      <Icon size={18} strokeWidth={1.9} />
+                    </span>
+
+                    <span
+                      className={
+                        isActive
+                          ? "text-blue-700"
+                          : "text-slate-600 group-hover:text-slate-900"
+                      }
+                    >
+                      {link.name}
+                    </span>
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Tutor card */}
+      <div className="m-4 rounded-2xl bg-[#0d1b3e] p-4 text-white shadow-lg shadow-slate-200">
+        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/10">
+          <Sparkles size={18} className="text-cyan-300" />
+        </div>
+
+        <p className="text-sm font-semibold">BestT Tutor</p>
+
+        <p className="mt-1 text-xs leading-5 text-slate-300">
+          Your materials are ready. Ask questions, explore ideas and learn at
+          your own pace.
+        </p>
+      </div>
+    </aside>
+  );
+}
+
