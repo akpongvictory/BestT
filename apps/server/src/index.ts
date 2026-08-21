@@ -17,11 +17,12 @@ const app = express();
 // Middleware
 app.use(
   cors({
-    origin: [
+      origin: [
       "http://localhost:3000",
       "http://localhost:5173",
+      "https://best-t-client-ms3n-jade.vercel.app",
     ],
-    credentials: true,
+        credentials: true,
   })
 );
 app.use(express.json());

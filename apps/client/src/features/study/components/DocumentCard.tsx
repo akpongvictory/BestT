@@ -102,14 +102,12 @@ export default function DocumentCard({
       return;
     }
 
-    const fileUrl =
-      document.fileUrl.startsWith("http")
-        ? document.fileUrl
-        : `http://localhost:5000${
-            document.fileUrl.startsWith("/")
-              ? ""
-              : "/"
-          }${document.fileUrl}`;
+ const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const fileUrl = document.fileUrl.startsWith("http")
+  ? document.fileUrl
+  : `${API_URL}${document.fileUrl.startsWith("/") ? "" : "/"}${document.fileUrl}`;
 
     window.open(
       fileUrl,
