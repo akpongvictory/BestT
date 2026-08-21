@@ -1,7 +1,5 @@
 import fs from "fs/promises";
 import crypto from "crypto";
-import { Prisma } from "@prisma/client";
-
 import prisma from "../lib/prisma";
 import {
   uploadDocumentFile,
