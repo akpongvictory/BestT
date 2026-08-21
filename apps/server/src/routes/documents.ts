@@ -15,6 +15,12 @@ router.post(
   addSource
 );
 
+router.post(
+  "/upload",
+  authenticate,
+  upload.single("file"),
+  uploadDocument
+)
 router.delete(
   "/:documentId",
   authenticate,
