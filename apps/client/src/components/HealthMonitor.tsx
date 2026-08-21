@@ -1,7 +1,20 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, CheckCircle2, AlertCircle, RefreshCw, Database, Clock, Server } from 'lucide-react';
-import { ApiResponse, HealthCheckResponse } from '@bestt/types';
+interface HealthCheckResponse {
+  status: string;
+  timestamp: string;
+  uptime: number;
+  environment: string;
+  database: string;
+}
+
+interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
 
 const fetchHealth = async (): Promise<HealthCheckResponse> => {
   const res = await fetch('/health');
@@ -121,3 +134,4 @@ export const HealthMonitor: React.FC = () => {
     </section>
   );
 };
+
