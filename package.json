@@ -2,7 +2,7 @@
   "name": "bestt-monorepo",
   "private": true,
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "workspaces": [
     "apps/*",
@@ -49,3 +49,4 @@
     "@rollup/rollup-linux-x64-gnu": "^4.62.4"
   }
 }
+
