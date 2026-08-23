@@ -22,6 +22,7 @@ interface LoginForm {
 
 interface LocationState {
   registered?: boolean;
+  passwordReset?: boolean;
 }
 
 interface ApiError {
@@ -94,8 +95,14 @@ export default function Login() {
     }
   }
 
+  const locationState =
+    location.state as LocationState | null;
+
   const registeredSuccessfully =
-    (location.state as LocationState | null)?.registered === true;
+    locationState?.registered === true;
+
+  const passwordResetSuccessfully =
+    locationState?.passwordReset === true;
 
   return (
     <AuthLayout
@@ -106,6 +113,31 @@ export default function Login() {
       alternateHref="/register"
     >
       <div className="space-y-5">
+        {/* Password reset success */}
+        {passwordResetSuccessfully && (
+          <div
+            role="status"
+            className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+          >
+            <CheckCircle2
+              size={18}
+              strokeWidth={2}
+              className="mt-0.5 shrink-0 text-emerald-600"
+            />
+
+            <div>
+              <p className="text-sm font-semibold text-emerald-900">
+                Password reset successful
+              </p>
+
+              <p className="mt-0.5 text-sm leading-5 text-emerald-800">
+                Your password has been updated. You can now sign
+                in.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Registration success */}
         {registeredSuccessfully && (
           <div
@@ -124,7 +156,8 @@ export default function Login() {
               </p>
 
               <p className="mt-0.5 text-sm leading-5 text-emerald-800">
-                Your account has been created. Sign in to get started.
+                Your account has been created. Sign in to get
+                started.
               </p>
             </div>
           </div>
@@ -238,7 +271,9 @@ export default function Login() {
                 placeholder="Enter your password"
                 aria-invalid={errors.password ? "true" : "false"}
                 aria-describedby={
-                  errors.password ? "password-error" : undefined
+                  errors.password
+                    ? "password-error"
+                    : undefined
                 }
                 disabled={isSubmitting}
                 className={`h-12 w-full rounded-xl border bg-white pl-11 pr-12 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 ${
@@ -253,10 +288,14 @@ export default function Login() {
 
               <button
                 type="button"
-                onClick={() => setShowPassword((value) => !value)}
+                onClick={() =>
+                  setShowPassword((value) => !value)
+                }
                 disabled={isSubmitting}
                 aria-label={
-                  showPassword ? "Hide password" : "Show password"
+                  showPassword
+                    ? "Hide password"
+                    : "Show password"
                 }
                 aria-pressed={showPassword}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition-colors duration-200 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -278,6 +317,15 @@ export default function Login() {
                 {errors.password.message}
               </p>
             )}
+
+            <div className="mt-2 flex justify-end">
+              <Link
+                to="/forgot-password"
+                className="text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700"
+              >
+                Forgot your password?
+              </Link>
+            </div>
           </div>
 
           {/* Submit */}

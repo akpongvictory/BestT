@@ -14,7 +14,7 @@ import {
 const router = Router();
 
 const appUrl =
-  process.env.APP_URL ?? 'http://localhost:5173';
+  process.env.APP_URL ?? 'https://best-t-client-ms3n-a0we78vp5-akpongvictorys-projects.vercel.app';
 
 const jwtSecret = process.env.JWT_SECRET;
 
@@ -798,5 +798,4 @@ router.post(
     }
   }
 );
-
 export default router;

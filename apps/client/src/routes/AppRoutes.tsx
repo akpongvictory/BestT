@@ -14,6 +14,9 @@ import Upload from "../pages/Upload";
 
 import ProtectedRoute from "./ProtectedRoute";
 
+import ForgotPassword from "../pages/ForgotPassword";
+import ResetPassword from "../pages/ResetPassword";
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -26,7 +29,14 @@ export default function AppRoutes() {
       <Route path="/login" element={<Login />} />
 
       <Route path="/register" element={<Register />} />
-
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
+        />
+        <Route
+          path="/reset-password"
+          element={<ResetPassword />}
+        />
 
       {/* =====================================================
           PROTECTED APPLICATION ROUTES
@@ -82,7 +92,6 @@ export default function AppRoutes() {
           element={<Quiz />}
         />
       </Route>
-
 
       {/* =====================================================
           UNKNOWN ROUTES
