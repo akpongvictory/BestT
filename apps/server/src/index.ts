@@ -17,13 +17,13 @@ const app = express();
 // Middleware
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:5173",
-      "https://bestt-client.vercel.app",
-      "https://best-t-client-ms3n-a0we78vp5-akpongvictorys-projects.vercel.app",
-      "https://best-t-client-ms3n-jade.vercel.app",
-    ],
+   origin: [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "https://best-t-client.vercel.app",
+  "https://best-t-client-ms3n-a0we78vp5-akpongvictorys-projects.vercel.app",
+  "https://best-t-client-ms3n-jade.vercel.app",
+],
     credentials: true,
   })
 );
