@@ -16,7 +16,7 @@ import ProtectedRoute from "./ProtectedRoute";
 
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
-
+import VerifyEmail from "../pages/VerifyEmail";
 export default function AppRoutes() {
   return (
     <Routes>
@@ -29,6 +29,11 @@ export default function AppRoutes() {
       <Route path="/login" element={<Login />} />
 
       <Route path="/register" element={<Register />} />
+
+          <Route
+      path="/verify-email"
+      element={<VerifyEmail />}
+    />
         <Route
           path="/forgot-password"
           element={<ForgotPassword />}
