@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { useCreateCourse } from "../hooks/useCreateCourse";
+import { getApiErrorMessage } from "../utils/apiError";
 
 interface Props {
   open: boolean;
@@ -36,16 +37,19 @@ export default function CreateCourseModal({
       toast.success("Course created successfully.", {
         description: `"${data.title}" is now in your workspace.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(
-        error?.response?.data?.message ??
-          error?.message ??
+        getApiErrorMessage(
+          error,
           "Unable to create the course. Please try again."
+        )
       );
     }
   };
 
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">

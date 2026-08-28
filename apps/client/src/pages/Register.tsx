@@ -13,6 +13,7 @@ import { useForm } from "react-hook-form";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import { registerUser } from "../services/auth";
+import { getApiErrorMessage } from "../utils/apiError";
 import { useAuth } from "../hooks/useAuth";
 import AuthLayout from "../layouts/AuthLayout";
 
@@ -53,14 +54,16 @@ export default function Register() {
           registered: true,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("REGISTER ERROR:", error);
 
-      setErrorMessage(
-        error.response?.data?.message ??
-          error.message ??
-          "Unable to create your account. Please check your details and try again."
-      );
+    setErrorMessage(
+  getApiErrorMessage(
+    error,
+    "Unable to create your account. Please check your details and try again."
+  )
+);
+
     } finally {
       setIsSubmitting(false);
     }
@@ -217,7 +220,7 @@ export default function Register() {
                 {...register("password", {
                   required: "Password is required.",
                   minLength: {
-                    value: 6,
+                    value: 8,
                     message: "Password must be at least 6 characters.",
                   },
                 })}
@@ -246,7 +249,7 @@ export default function Register() {
               </p>
             ) : (
               <p className="mt-2 text-xs text-slate-400">
-                Use at least 6 characters.
+                Use at least 8 characters.
               </p>
             )}
           </div>
@@ -292,3 +295,8 @@ export default function Register() {
     </AuthLayout>
   );
 }
+
+
+
+
+

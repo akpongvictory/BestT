@@ -10,6 +10,7 @@ import {
 import DashboardLayout from "../layouts/DashboardLayout";
 import { useCourse } from "../hooks/useCourse";
 import api from "../lib/api";
+import { getApiErrorMessage } from "../utils/apiError";
 
 interface Source {
   documentId: string;
@@ -39,45 +40,45 @@ export default function Chat() {
   } = useCourse(courseId ?? "");
 
   useEffect(() => {
-  if (!courseId) {
-    return;
-  }
-
-  async function loadChatHistory() {
-    try {
-      const response = await api.get(
-        `/chat/history/${courseId}`
-      );
-
-      const data = response.data?.data;
-
-      if (!data?.messages) {
-        return;
-      }
-
-      setMessages(
-        data.messages.map(
-          (message: {
-            id: string;
-            role: "user" | "assistant";
-            content: string;
-            createdAt: string;
-          }) => ({
-            role: message.role,
-            content: message.content,
-          })
-        )
-      );
-    } catch (err) {
-      console.error(
-        "Failed to load chat history:",
-        err
-      );
+    if (!courseId) {
+      return;
     }
-  }
 
-  loadChatHistory();
-}, [courseId]);
+    async function loadChatHistory() {
+      try {
+        const response = await api.get(
+          `/chat/history/${courseId}`
+        );
+
+        const data = response.data?.data;
+
+        if (!data?.messages) {
+          return;
+        }
+
+        setMessages(
+          data.messages.map(
+            (message: {
+              id: string;
+              role: "user" | "assistant";
+              content: string;
+              createdAt: string;
+            }) => ({
+              role: message.role,
+              content: message.content,
+            })
+          )
+        );
+      } catch (err) {
+        console.error(
+          "Failed to load chat history:",
+          err
+        );
+      }
+    }
+
+    loadChatHistory();
+  }, [courseId]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -121,12 +122,13 @@ export default function Chat() {
           sources: data?.sources ?? [],
         },
       ]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Chat request failed:", err);
 
-      const message =
-        err?.response?.data?.message ??
-        "Failed to generate a tutor response.";
+      const message = getApiErrorMessage(
+        err,
+        "Failed to generate a tutor response."
+      );
 
       setError(message);
     } finally {
@@ -160,7 +162,6 @@ export default function Chat() {
   return (
     <DashboardLayout>
       <div className="mx-auto flex min-h-[calc(100vh-140px)] max-w-5xl flex-col">
-
         {/* Header */}
         <div className="mb-6">
           <button
@@ -194,10 +195,8 @@ export default function Chat() {
 
         {/* Chat container */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-
           {/* Messages */}
           <div className="flex-1 space-y-6 overflow-y-auto p-5 sm:p-8">
-
             {messages.length === 0 && (
               <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
@@ -300,10 +299,12 @@ export default function Chat() {
                 <div className="rounded-2xl rounded-bl-md bg-slate-50 px-5 py-4">
                   <div className="flex gap-1">
                     <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" />
+
                     <span
                       className="h-2 w-2 animate-bounce rounded-full bg-slate-400"
                       style={{ animationDelay: "120ms" }}
                     />
+
                     <span
                       className="h-2 w-2 animate-bounce rounded-full bg-slate-400"
                       style={{ animationDelay: "240ms" }}

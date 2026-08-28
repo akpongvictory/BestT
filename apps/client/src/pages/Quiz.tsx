@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
+import { getApiErrorMessage } from "../utils/apiError";
 
 import DashboardLayout from "../layouts/DashboardLayout";
 import {
@@ -7,6 +9,7 @@ import {
   generateQuiz,
   submitQuiz,
 } from "../api/quiz";
+
 
 interface QuizQuestion {
   id: string;
@@ -34,7 +37,7 @@ interface SubmissionResult {
   score: number;
   totalQuestions: number;
   percentage: number;
-  results: QuizResult[];
+  results: QuizResult[]; 
 }
 
 export default function Quiz() {
@@ -56,6 +59,7 @@ export default function Quiz() {
   useEffect(() => {
     if (!courseId) return;
 
+// LOADING THE QUIZE HERE BRO!
     const loadQuiz = async () => {
       try {
         setLoading(true);
@@ -64,13 +68,17 @@ export default function Quiz() {
         const response = await getQuiz(courseId);
 
         setQuiz(response.data.data);
-      } catch (err: any) {
-        if (err?.response?.status === 404) {
+      } catch (err: unknown) {
+        if (
+        axios.isAxiosError(err) && 
+        err.response?.status === 404 ) {
           setQuiz(null);
         } else {
           setError(
-            err?.response?.data?.message ??
+          getApiErrorMessage(
+            err,
               "Failed to load quiz."
+          )
           );
         }
       } finally {
@@ -93,11 +101,13 @@ export default function Quiz() {
       setQuiz(response.data.data);
       setAnswers({});
       setResult(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(
-        err?.response?.data?.message ??
+      getApiErrorMessage(
+        err,
           "Failed to generate quiz."
-      );
+      )
+    );
     } finally {
       setGenerating(false);
     }
@@ -141,11 +151,13 @@ export default function Quiz() {
         top: 0,
         behavior: "smooth",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(
-        err?.response?.data?.message ??
+        getApiErrorMessage(
+          err,
           "Failed to submit quiz."
-      );
+      )
+    );
     } finally {
       setSubmitting(false);
     }
