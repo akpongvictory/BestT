@@ -6,11 +6,15 @@ import {
   Send,
   User,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 
 import DashboardLayout from "../layouts/DashboardLayout";
 import { useCourse } from "../hooks/useCourse";
 import api from "../lib/api";
 import { getApiErrorMessage } from "../utils/apiError";
+
 
 interface Source {
   documentId: string;
@@ -254,10 +258,102 @@ export default function Chat() {
                       : "rounded-bl-md bg-slate-50 text-slate-700"
                   }`}
                 >
-                  <p className="whitespace-pre-wrap text-sm leading-7">
-                    {message.content}
-                  </p>
-
+                  <div className="text-sm leading-7">
+  <ReactMarkdown
+    remarkPlugins={[remarkGfm]}
+    components={{
+      h1: ({ children }) => (
+        <h1 className="mb-4 mt-2 text-2xl font-bold text-slate-900">
+          {children}
+        </h1>
+      ),
+      h2: ({ children }) => (
+        <h2 className="mb-3 mt-5 text-xl font-bold text-slate-900">
+          {children}
+        </h2>
+      ),
+      h3: ({ children }) => (
+        <h3 className="mb-2 mt-4 text-lg font-semibold text-slate-900">
+          {children}
+        </h3>
+      ),
+      p: ({ children }) => (
+        <p className="mb-3 last:mb-0">
+          {children}
+        </p>
+      ),
+      strong: ({ children }) => (
+        <strong className="font-semibold text-slate-900">
+          {children}
+        </strong>
+      ),
+      em: ({ children }) => (
+        <em className="italic">
+          {children}
+        </em>
+      ),
+      ul: ({ children }) => (
+        <ul className="mb-3 ml-5 list-disc space-y-1">
+          {children}
+        </ul>
+      ),
+      ol: ({ children }) => (
+        <ol className="mb-3 ml-5 list-decimal space-y-1">
+          {children}
+        </ol>
+      ),
+      li: ({ children }) => (
+        <li className="pl-1">
+          {children}
+        </li>
+      ),
+      blockquote: ({ children }) => (
+        <blockquote className="my-3 border-l-4 border-blue-300 pl-4 italic text-slate-500">
+          {children}
+        </blockquote>
+      ),
+      code: ({ children }) => (
+        <code className="rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-800">
+          {children}
+        </code>
+      ),
+      pre: ({ children }) => (
+        <pre className="my-4 overflow-x-auto rounded-xl bg-slate-900 p-4 text-xs leading-6 text-slate-100">
+          {children}
+        </pre>
+      ),
+      a: ({ href, children }) => (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-blue-600 underline hover:text-blue-700"
+        >
+          {children}
+        </a>
+      ),
+      table: ({ children }) => (
+        <div className="my-4 overflow-x-auto">
+          <table className="min-w-full border-collapse text-sm">
+            {children}
+          </table>
+        </div>
+      ),
+      th: ({ children }) => (
+        <th className="border border-slate-200 bg-slate-100 px-3 py-2 text-left font-semibold text-slate-800">
+          {children}
+        </th>
+      ),
+      td: ({ children }) => (
+        <td className="border border-slate-200 px-3 py-2">
+          {children}
+        </td>
+      ),
+    }}
+  >
+    {message.content}
+  </ReactMarkdown>
+</div>
                   {message.sources &&
                     message.sources.length > 0 && (
                       <div className="mt-4 border-t border-slate-200 pt-3">
