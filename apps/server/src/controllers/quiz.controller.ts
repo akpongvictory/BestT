@@ -218,15 +218,13 @@ Return this exact structure:
 Course title:
 ${course.title}
 
-Course material:
-${context}
 `;
 
     console.log("[QUIZ] Calling BestTTutorAgent...");
 
     const rawResponse = await tutor.answer({
       question: prompt,
-      context,
+      context: ""
     });
 
     console.log(

@@ -73,13 +73,74 @@ export class ProviderRouter implements LLMProvider {
           `${provider.name}: ${message}`
         );
 
-        this.markUnhealthy(provider.name);
+        const cooldown =
+          this.getCooldownMs(error);
+
+        if (cooldown > 0) {
+          this.markUnhealthy(
+            provider.name,
+            cooldown
+          );
+
+          console.log(
+            `[AI Router] ${provider.name} marked unhealthy for ${cooldown}ms`
+          );
+        } else {
+          console.log(
+            `[AI Router] ${provider.name} remains available for future requests`
+          );
+        }
       }
     }
 
     throw new Error(
       `All AI providers failed.\n${errors.join("\n")}`
     );
+  }
+
+  private getCooldownMs(
+    error: unknown
+  ): number {
+    const message =
+      error instanceof Error
+        ? error.message.toLowerCase()
+        : String(error).toLowerCase();
+
+    const permanentPatterns = [
+      "authentication",
+      "unauthorized",
+      "forbidden",
+      "permission",
+      "insufficient permissions",
+      "invalid api key",
+      "invalid_api_key",
+    ];
+
+    if (
+      permanentPatterns.some((pattern) =>
+        message.includes(pattern)
+      )
+    ) {
+      return 10 * 60 * 1000;
+    }
+
+    const requestSpecificPatterns = [
+      "413",
+      "request too large",
+      "too many tokens",
+      "tokens per minute",
+      "rate_limit_exceeded",
+    ];
+
+    if (
+      requestSpecificPatterns.some((pattern) =>
+        message.includes(pattern)
+      )
+    ) {
+      return 0;
+    }
+
+    return this.cooldownMs;
   }
 
   private isCoolingDown(
@@ -104,19 +165,18 @@ export class ProviderRouter implements LLMProvider {
   }
 
   private markUnhealthy(
-    providerName: string
+    providerName: string,
+    cooldownMs = this.cooldownMs
   ): void {
     this.unhealthyUntil.set(
       providerName,
-      Date.now() + this.cooldownMs
+      Date.now() + cooldownMs
     );
   }
 
   private markHealthy(
     providerName: string
   ): void {
-    this.unhealthyUntil.delete(
-      providerName
-    );
+    this.unhealthyUntil.delete(providerName);
   }
 }

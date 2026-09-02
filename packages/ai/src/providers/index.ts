@@ -152,6 +152,7 @@ export function createLLMRouter(
       const order =
       config.providerOrder ?? [
         "groq",
+        "gemini",
         "huggingface",
       
       ];
