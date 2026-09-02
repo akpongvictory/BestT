@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
@@ -14,7 +13,8 @@ import {
 const router = Router();
 
 const appUrl =
-  process.env.APP_URL ?? 'https://best-t-client-ms3n-a0we78vp5-akpongvictorys-projects.vercel.app';
+  process.env.APP_URL ??
+  'https://best-t-client-ms3n-a0we78vp5-akpongvictorys-projects.vercel.app';
 
 const jwtSecret = process.env.JWT_SECRET;
 
@@ -22,34 +22,29 @@ if (!jwtSecret) {
   throw new Error('JWT_SECRET is not configured.');
 }
 
-const VERIFICATION_TOKEN_EXPIRY_MS =
-  24 * 60 * 60 * 1000;
+const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
+const PASSWORD_RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000;
 
-const PASSWORD_RESET_TOKEN_EXPIRY_MS =
-  60 * 60 * 1000;
-
-// Normalize email for consistent storage and lookup.
 const normalizeEmail = (email: string): string => {
   return email.trim().toLowerCase();
 };
 
-// Normalize whitespace without changing capitalization.
 const normalizeName = (name: string): string => {
   return name.trim().replace(/\s+/g, ' ');
 };
 
-// Create a secure email verification token.
-const createVerificationToken = async (
-  userId: string
-): Promise<string> => {
-  const token = crypto
-    .randomBytes(32)
-    .toString('hex');
-
-  const tokenHash = crypto
+const hashToken = (token: string): string => {
+  return crypto
     .createHash('sha256')
     .update(token)
     .digest('hex');
+};
+
+const createVerificationToken = async (
+  userId: string
+): Promise<string> => {
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashToken(token);
 
   const expiresAt = new Date(
     Date.now() + VERIFICATION_TOKEN_EXPIRY_MS
@@ -66,18 +61,11 @@ const createVerificationToken = async (
   return token;
 };
 
-// Create a secure password reset token.
 const createPasswordResetToken = async (
   userId: string
 ): Promise<string> => {
-  const token = crypto
-    .randomBytes(32)
-    .toString('hex');
-
-  const tokenHash = crypto
-    .createHash('sha256')
-    .update(token)
-    .digest('hex');
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashToken(token);
 
   const expiresAt = new Date(
     Date.now() + PASSWORD_RESET_TOKEN_EXPIRY_MS
@@ -121,7 +109,6 @@ router.post(
     try {
       const { name, email, password } = req.body;
 
-      // Validate required fields.
       if (
         typeof name !== 'string' ||
         typeof email !== 'string' ||
@@ -134,12 +121,9 @@ router.post(
         });
       }
 
-      // Normalize input.
       const normalizedName = normalizeName(name);
-      const normalizedEmail =
-        normalizeEmail(email);
+      const normalizedEmail = normalizeEmail(email);
 
-      // Validate name.
       if (!normalizedName) {
         return res.status(400).json({
           success: false,
@@ -155,7 +139,6 @@ router.post(
         });
       }
 
-      // Validate email.
       const emailRegex =
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -167,7 +150,6 @@ router.post(
         });
       }
 
-      // Validate password.
       if (password.length < 8) {
         return res.status(400).json({
           success: false,
@@ -176,7 +158,6 @@ router.post(
         });
       }
 
-      // Check whether the email is already registered.
       const existingUser =
         await prisma.user.findUnique({
           where: {
@@ -191,13 +172,11 @@ router.post(
         });
       }
 
-      // Hash password.
       const hashedPassword = await bcrypt.hash(
         password,
         10
       );
 
-      // Create user.
       const user = await prisma.user.create({
         data: {
           name: normalizedName,
@@ -207,21 +186,20 @@ router.post(
         },
       });
 
-      // Create verification token.
       const verificationToken =
         await createVerificationToken(user.id);
 
       const verificationUrl =
-        `${appUrl}/verify-email?token=${verificationToken}`;
+        `${appUrl}/verify-email?token=${encodeURIComponent(
+          verificationToken
+        )}`;
 
-      // Send verification email.
       await sendVerificationEmail({
         to: user.email,
         name: user.name,
         verificationUrl,
       });
 
-      // Remove password from response.
       const {
         password: _password,
         ...userWithoutPassword
@@ -251,7 +229,6 @@ router.post(
     try {
       const { email, password } = req.body;
 
-      // Validate required fields.
       if (
         typeof email !== 'string' ||
         typeof password !== 'string'
@@ -263,11 +240,8 @@ router.post(
         });
       }
 
-      // Normalize email.
-      const normalizedEmail =
-        normalizeEmail(email);
+      const normalizedEmail = normalizeEmail(email);
 
-      // Find user.
       const user =
         await prisma.user.findUnique({
           where: {
@@ -275,7 +249,6 @@ router.post(
           },
         });
 
-      // Use the same error for unknown users and incorrect passwords.
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -283,7 +256,6 @@ router.post(
         });
       }
 
-      // Compare password.
       const passwordMatch =
         await bcrypt.compare(
           password,
@@ -297,7 +269,6 @@ router.post(
         });
       }
 
-      // Require email verification before login.
       if (!user.emailVerified) {
         return res.status(403).json({
           success: false,
@@ -307,7 +278,6 @@ router.post(
         });
       }
 
-      // Generate JWT.
       const token = jwt.sign(
         {
           id: user.id,
@@ -349,10 +319,17 @@ router.get(
     res: Response
   ) => {
     try {
+      if (!req.user?.id) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required.',
+        });
+      }
+
       const user =
         await prisma.user.findUnique({
           where: {
-            id: req.user!.id,
+            id: req.user.id,
           },
           select: {
             id: true,
@@ -393,11 +370,11 @@ router.get(
   '/verify-email',
   async (req: Request, res: Response) => {
     try {
-      const { token } = req.query;
+      const rawToken = req.query.token;
 
       if (
-        !token ||
-        typeof token !== 'string'
+        typeof rawToken !== 'string' ||
+        !rawToken.trim()
       ) {
         return res.status(400).json({
           success: false,
@@ -406,14 +383,9 @@ router.get(
         });
       }
 
-      // Hash token received from email.
-      const tokenHash = crypto
-        .createHash('sha256')
-        .update(token)
-        .digest('hex');
+      const tokenHash = hashToken(rawToken);
 
-      // Find verification token.
-      const verificationToken =
+      const verificationRecord =
         await prisma.emailVerificationToken.findUnique(
           {
             where: {
@@ -423,6 +395,8 @@ router.get(
               user: {
                 select: {
                   id: true,
+                  name: true,
+                  email: true,
                   emailVerified: true,
                 },
               },
@@ -430,7 +404,7 @@ router.get(
           }
         );
 
-      if (!verificationToken) {
+      if (!verificationRecord) {
         return res.status(400).json({
           success: false,
           message:
@@ -438,18 +412,15 @@ router.get(
         });
       }
 
-      // Check expiration.
       if (
-        verificationToken.expiresAt <
+        verificationRecord.expiresAt <
         new Date()
       ) {
-        await prisma.emailVerificationToken.delete(
-          {
-            where: {
-              id: verificationToken.id,
-            },
-          }
-        );
+        await prisma.emailVerificationToken.delete({
+          where: {
+            id: verificationRecord.id,
+          },
+        });
 
         return res.status(400).json({
           success: false,
@@ -458,17 +429,14 @@ router.get(
         });
       }
 
-      // Clean up token if already verified.
       if (
-        verificationToken.user.emailVerified
+        verificationRecord.user.emailVerified
       ) {
-        await prisma.emailVerificationToken.delete(
-          {
-            where: {
-              id: verificationToken.id,
-            },
-          }
-        );
+        await prisma.emailVerificationToken.delete({
+          where: {
+            id: verificationRecord.id,
+          },
+        });
 
         return res.status(200).json({
           success: true,
@@ -476,11 +444,10 @@ router.get(
         });
       }
 
-      // Verify email and consume token atomically.
       await prisma.$transaction([
         prisma.user.update({
           where: {
-            id: verificationToken.userId,
+            id: verificationRecord.userId,
           },
           data: {
             emailVerified: true,
@@ -488,15 +455,46 @@ router.get(
         }),
         prisma.emailVerificationToken.delete({
           where: {
-            id: verificationToken.id,
+            id: verificationRecord.id,
           },
         }),
       ]);
 
+      const verifiedUser =
+        await prisma.user.findUnique({
+          where: {
+            id: verificationRecord.userId,
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        });
+
+      if (!verifiedUser) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found.',
+        });
+      }
+
+      const token = jwt.sign(
+        {
+          id: verifiedUser.id,
+          email: verifiedUser.email,
+        },
+        jwtSecret,
+        {
+          expiresIn: '7d',
+        }
+      );
+
       return res.status(200).json({
         success: true,
-        message:
-          'Email verified successfully. You can now log in.',
+        message: 'Email verified successfully.',
+        token,
+        data: verifiedUser,
       });
     } catch (error) {
       console.error(
@@ -526,11 +524,9 @@ router.post(
         });
       }
 
-      // Normalize email.
       const normalizedEmail =
         normalizeEmail(email);
 
-      // Find user.
       const user =
         await prisma.user.findUnique({
           where: {
@@ -538,7 +534,6 @@ router.post(
           },
         });
 
-      // Do not reveal whether an account exists.
       if (!user) {
         return res.status(200).json({
           success: true,
@@ -547,7 +542,6 @@ router.post(
         });
       }
 
-      // Don't resend if already verified.
       if (user.emailVerified) {
         return res.status(200).json({
           success: true,
@@ -556,7 +550,6 @@ router.post(
         });
       }
 
-      // Remove previous verification tokens.
       await prisma.emailVerificationToken.deleteMany(
         {
           where: {
@@ -565,14 +558,14 @@ router.post(
         }
       );
 
-      // Create new verification token.
       const verificationToken =
         await createVerificationToken(user.id);
 
       const verificationUrl =
-        `${appUrl}/verify-email?token=${verificationToken}`;
+        `${appUrl}/verify-email?token=${encodeURIComponent(
+          verificationToken
+        )}`;
 
-      // Send verification email.
       await sendVerificationEmail({
         to: user.email,
         name: user.name,
@@ -612,11 +605,9 @@ router.post(
         });
       }
 
-      // Normalize email.
       const normalizedEmail =
         normalizeEmail(email);
 
-      // Find user.
       const user =
         await prisma.user.findUnique({
           where: {
@@ -624,7 +615,6 @@ router.post(
           },
         });
 
-      // Do not reveal whether an account exists.
       if (!user) {
         return res.status(200).json({
           success: true,
@@ -633,25 +623,20 @@ router.post(
         });
       }
 
-      // Remove existing reset tokens.
-      await prisma.passwordResetToken.deleteMany(
-        {
-          where: {
-            userId: user.id,
-          },
-        }
-      );
+      await prisma.passwordResetToken.deleteMany({
+        where: {
+          userId: user.id,
+        },
+      });
 
-      // Create new reset token.
       const resetToken =
-        await createPasswordResetToken(
-          user.id
-        );
+        await createPasswordResetToken(user.id);
 
       const resetUrl =
-        `${appUrl}/reset-password?token=${resetToken}`;
+        `${appUrl}/reset-password?token=${encodeURIComponent(
+          resetToken
+        )}`;
 
-      // Send password reset email.
       await sendPasswordResetEmail({
         to: user.email,
         name: user.name,
@@ -685,28 +670,25 @@ router.post(
       const { token, password } = req.body;
 
       if (
-        !token ||
-        typeof token !== 'string'
+        typeof token !== 'string' ||
+        !token.trim()
       ) {
         return res.status(400).json({
           success: false,
-          message:
-            'Reset token is required.',
+          message: 'Reset token is required.',
         });
       }
 
       if (
-        !password ||
-        typeof password !== 'string'
+        typeof password !== 'string' ||
+        !password
       ) {
         return res.status(400).json({
           success: false,
-          message:
-            'New password is required.',
+          message: 'New password is required.',
         });
       }
 
-      // Validate password.
       if (password.length < 8) {
         return res.status(400).json({
           success: false,
@@ -715,14 +697,9 @@ router.post(
         });
       }
 
-      // Hash token received from email.
-      const tokenHash = crypto
-        .createHash('sha256')
-        .update(token)
-        .digest('hex');
+      const tokenHash = hashToken(token);
 
-      // Find reset token.
-      const resetToken =
+      const resetRecord =
         await prisma.passwordResetToken.findUnique(
           {
             where: {
@@ -731,7 +708,7 @@ router.post(
           }
         );
 
-      if (!resetToken) {
+      if (!resetRecord) {
         return res.status(400).json({
           success: false,
           message:
@@ -739,18 +716,15 @@ router.post(
         });
       }
 
-      // Check expiration.
       if (
-        resetToken.expiresAt <
+        resetRecord.expiresAt <
         new Date()
       ) {
-        await prisma.passwordResetToken.delete(
-          {
-            where: {
-              id: resetToken.id,
-            },
-          }
-        );
+        await prisma.passwordResetToken.delete({
+          where: {
+            id: resetRecord.id,
+          },
+        });
 
         return res.status(400).json({
           success: false,
@@ -759,15 +733,13 @@ router.post(
         });
       }
 
-      // Hash new password.
       const hashedPassword =
         await bcrypt.hash(password, 10);
 
-      // Update password and invalidate all reset tokens.
       await prisma.$transaction([
         prisma.user.update({
           where: {
-            id: resetToken.userId,
+            id: resetRecord.userId,
           },
           data: {
             password: hashedPassword,
@@ -775,7 +747,7 @@ router.post(
         }),
         prisma.passwordResetToken.deleteMany({
           where: {
-            userId: resetToken.userId,
+            userId: resetRecord.userId,
           },
         }),
       ]);
@@ -798,4 +770,5 @@ router.post(
     }
   }
 );
+
 export default router;
